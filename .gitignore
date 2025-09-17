@@ -1,0 +1,34 @@
+# Emacs generated files
+*.elc
+*~
+\#*\#
+.\#*
+.DS_Store
+
+# Package files
+elpa/
+auto-save-list/
+url/
+eshell/
+.cache/
+tramp
+network-security.data
+recentf
+bookmarks
+.org-id-locations
+org-persist/
+
+# Compiled org files (but keep init.el)
+config.el
+
+# Personal files that shouldn't be shared
+custom.el
+.mc-lists.el
+
+# Downloaded themes
+themes/
+
+# Backup files
+*~
+\#*\#
+.\#*
