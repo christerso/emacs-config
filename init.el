@@ -16,6 +16,8 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
+ '(current-language-environment "UTF-8")
+ '(global-display-line-numbers-mode t)
  '(ignored-local-variable-values
    '((flycheck-clang-language-standard . "c11")
      (flycheck-gcc-language-standard . "c11") (c-standard . "c11")
@@ -24,10 +26,21 @@
      (explicit-shell-file-name . "cmdproxy.exe")
      (shell-command-switch . "/c") (shell-file-name . "cmdproxy.exe")
      (gud-gdb-command-name . "C:\\remedybg.exe dream.rdbg")))
- '(package-selected-packages nil))
+ '(menu-bar-mode nil)
+ '(package-selected-packages
+   '(all-the-icons-dired company consult-projectile dired-sidebar eat
+                         go-mode grip-mode helm-projectile helm-rg
+                         impatient-mode marginalia
+                         markdown-preview-mode multiple-cursors
+                         orderless perspective rainbow-delimiters
+                         treemacs-all-the-icons treemacs-evil
+                         treemacs-icons-dired treemacs-magit
+                         treemacs-projectile vertico))
+ '(tool-bar-mode nil))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(isearch ((t (:background "gray" :foreground "black")))))
+ '(isearch ((t (:background "gray" :foreground "black"))))
+ '(markdown-code-face ((t nil))))

@@ -16,10 +16,14 @@ Clean up the default Emacs interface for a minimal development environment.
 (setq inhibit-startup-message t)
 (setq initial-scratch-message nil)
 
-;; Replace default scratch buffer with persistent org-mode scratch
-(setq initial-major-mode 'org-mode)            ; Start scratch in org-mode
-(setq initial-buffer-choice                    ; Use custom scratch buffer
-      (lambda () (get-buffer-create "*scratch*")))
+;; Replace default scratch buffer with interactive dashboard
+(setq initial-major-mode 'org-mode)            ; Start in org-mode
+(setq initial-buffer-choice                    ; Use dashboard as startup buffer
+      (lambda ()
+        (let ((dashboard-file (expand-file-name "dashboard.org" user-emacs-directory)))
+          (if (file-exists-p dashboard-file)
+              (find-file-noselect dashboard-file)
+            (get-buffer-create "*Dashboard*")))))
 
 ;; Session persistence - remember everything automatically
 (desktop-save-mode 1)                          ; Save/restore buffers and window config
@@ -43,10 +47,14 @@ Clean up the default Emacs interface for a minimal development environment.
 
 ;; Persistent org-mode scratch buffer
 (defun save-persistent-scratch ()
-  "Save the org scratch buffer to disk."
-  (with-current-buffer "*scratch*"
-    (write-region (point-min) (point-max)
-                  (expand-file-name "scratch.org" user-emacs-directory))))
+  "Save the org scratch buffer to disk only if it has been modified."
+  (when (get-buffer "*scratch*")
+    (with-current-buffer "*scratch*"
+      (when (buffer-modified-p)
+        (write-region (point-min) (point-max)
+                      (expand-file-name "scratch.org" user-emacs-directory))
+        (set-buffer-modified-p nil)  ; Mark as unmodified after saving
+        (message "Scratch buffer saved")))))
 
 (defun load-persistent-scratch ()
   "Load the persistent org scratch buffer from disk."
@@ -96,6 +104,18 @@ Clean up the default Emacs interface for a minimal development environment.
   (unless (eq major-mode 'org-mode)
     (org-mode)))
 
+;; Dashboard functions
+(defun open-dashboard ()
+  "Open the Emacs dashboard."
+  (interactive)
+  (let ((dashboard-file (expand-file-name "dashboard.org" user-emacs-directory)))
+    (if (file-exists-p dashboard-file)
+        (find-file dashboard-file)
+      (message "Dashboard file not found: %s" dashboard-file))))
+
+;; Key bindings for dashboard and scratch
+(global-set-key (kbd "C-c d") 'open-dashboard)      ; Quick access to dashboard
+(global-set-key (kbd "C-c C-d") 'open-dashboard)    ; Alternative dashboard access
 (global-set-key (kbd "C-c s c") 'create-scratch-buffer)
 
 ;; Basic UI cleanup
@@ -128,6 +148,13 @@ Basic editing preferences for consistent code style.
 ;; Basic editing
 (setq-default indent-tabs-mode nil)
 (setq-default tab-width 4)
+
+;; IMMEDIATE KEYBINDING FIXES - Essential navigation
+;; Recent files
+(global-set-key (kbd "C-x C-r") 'recentf-open-files)
+
+;; Enhanced buffer switching (fallback to default if consult not available)
+(global-set-key (kbd "C-x b") 'switch-to-buffer)
 #+END_SRC
 
 * Package Management
@@ -139,15 +166,17 @@ Configure package repositories and disable signature verification for Windows co
 (require 'package)
 (setq package-archives
       '(("gnu" . "https://elpa.gnu.org/packages/")
-        ("melpa" . "https://melpa.org/packages/")))
+        ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+        ("melpa" . "https://melpa.org/packages/")
+        ("melpa-stable" . "https://stable.melpa.org/packages/")))
 
 ;; Disable package signature verification to avoid GPG issues
 (setq package-check-signature nil)
 
 (package-initialize)
 
-;; Refresh package contents if needed
-(unless package-archive-contents
+;; Refresh package contents only if needed (to speed up startup)
+(when (not package-archive-contents)
   (package-refresh-contents))
 #+END_SRC
 
@@ -172,18 +201,254 @@ Install and configure the voidlight theme for comfortable dark coding.
   (add-to-list 'custom-theme-load-path theme-dir)
 
   ;; Load the voidlight theme
-  (load-theme 'voidlight t))
+  (load-theme 'voidlight t)
+
+  ;; Customize selection/region color - darker background only
+  (set-face-background 'region "#1e2124")        ; Much darker gray selection
+
+  ;; Also make secondary selection darker
+  (set-face-background 'secondary-selection "#151618"))
+#+END_SRC
+
+** Claude Code Integration
+Install and configure claude-code.el for enhanced AI integration.
+
+#+BEGIN_SRC emacs-lisp
+;; Download and install claude-code.el from GitHub
+(let ((claude-code-dir (expand-file-name "claude-code" user-emacs-directory))
+      (claude-code-file (expand-file-name "claude-code/claude-code.el" user-emacs-directory)))
+
+  ;; Create claude-code directory if it doesn't exist
+  (unless (file-directory-p claude-code-dir)
+    (make-directory claude-code-dir t))
+
+  ;; Download claude-code.el if it doesn't exist
+  (unless (file-exists-p claude-code-file)
+    (message "Downloading claude-code.el from GitHub...")
+    (url-copy-file "https://raw.githubusercontent.com/stevemolitor/claude-code.el/main/claude-code.el"
+                   claude-code-file t))
+
+  ;; Add claude-code directory to load path
+  (add-to-list 'load-path claude-code-dir)
+
+  ;; Load claude-code if available
+  (when (file-exists-p claude-code-file)
+    (condition-case err
+        (progn
+          (require 'claude-code)
+
+          ;; Configure claude-code for Windows compatibility
+          (when (eq system-type 'windows-nt)
+            ;; Add Windows-specific configuration after claude-code loads
+            (with-eval-after-load 'claude-code
+              ;; Set up alternative backends if eat fails
+              (when (boundp 'claude-code-terminal-backend)
+                (message "Configuring claude-code terminal backend..."))))
+
+          (message "claude-code.el loaded successfully"))
+      (error
+       (message "Error loading claude-code.el: %s" (error-message-string err))))))
 #+END_SRC
 
 ** Font Configuration
 Configure a beautiful Nerd Font for optimal programming experience with icons and ligatures.
 
 #+BEGIN_SRC emacs-lisp
-;; Set default font to JetBrains Mono Nerd Font
-;; Download from: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip
+;; Font customization function - stand on a font and open customize options
+(defun customize-font-at-point ()
+  "Open customize options for the font at point."
+  (interactive)
+  (let* ((face-prop (get-char-property (point) 'face))
+         (face-name (cond
+                     ;; Handle list of faces
+                     ((listp face-prop) (car face-prop))
+                     ;; Handle single face
+                     ((symbolp face-prop) face-prop)
+                     ;; Handle face attributes (like :foreground)
+                     ((keywordp face-prop) 'default)
+                     ;; Fallback to face-at-point
+                     (t (face-at-point t)))))
+    ;; Ensure we have a valid face symbol
+    (when (or (not face-name) (keywordp face-name) (not (symbolp face-name)))
+      (setq face-name 'default))
+    (message "Customizing font for face: %s" face-name)
+    (customize-face face-name)))
+
+;; Key binding for font customization at point
+(global-set-key (kbd "C-c C-f") 'customize-font-at-point)
+
+;; AGGRESSIVE JETBRAINS FONT ENFORCEMENT
+;; This ensures JetBrains Mono Nerd Font is used everywhere without exception
+
+(defvar my-protected-face-patterns
+  '("icon" "treemacs" "all-the-icons" "nerd-icons" "dired-directory"
+    "magit-diff" "git-gutter" "flycheck" "company-tooltip" "lsp-ui"
+    "rainbow-delimiters" "hl-line" "region" "isearch" "lazy-highlight"
+    "show-paren" "cursor" "fringe" "vertical-border")
+  "Face name patterns that should not be modified by font enforcement.
+These faces often contain special symbols, icons, or UI elements.")
+
+(defun my-face-should-be-protected-p (face-name)
+  "Return t if FACE-NAME should be protected from font changes."
+  (let ((face-str (symbol-name face-name)))
+    (cl-some (lambda (pattern)
+               (string-match-p pattern face-str))
+             my-protected-face-patterns)))
+
+(defun force-jetbrains-font-selectively ()
+  "Enforce JetBrains Mono font only on text faces, preserving special symbols."
+  (when (member "JetBrainsMono Nerd Font" (font-family-list))
+    ;; Core text faces - always safe to change
+    (set-face-attribute 'default nil :family "JetBrainsMono Nerd Font" :height 110)
+    (set-face-attribute 'fixed-pitch nil :family "JetBrainsMono Nerd Font" :height 110)
+    (set-face-attribute 'variable-pitch nil :family "JetBrainsMono Nerd Font" :height 110)
+
+    ;; Mode line (safe for text content)
+    (set-face-attribute 'mode-line nil :family "JetBrainsMono Nerd Font" :height 100)
+    (set-face-attribute 'mode-line-inactive nil :family "JetBrainsMono Nerd Font" :height 100)
+    (set-face-attribute 'header-line nil :family "JetBrainsMono Nerd Font" :height 110)
+    (set-face-attribute 'minibuffer-prompt nil :family "JetBrainsMono Nerd Font" :height 110)
+
+    ;; Programming language faces (safe - just text styling)
+    (dolist (face '(font-lock-comment-face font-lock-string-face font-lock-keyword-face
+                    font-lock-function-name-face font-lock-variable-name-face
+                    font-lock-type-face font-lock-constant-face font-lock-builtin-face
+                    font-lock-preprocessor-face font-lock-doc-face))
+      (when (facep face)
+        (set-face-attribute face nil :family "JetBrainsMono Nerd Font")))
+
+    ;; Odin-specific faces (if they exist)
+    (dolist (face '(odin-font-lock-keyword-face odin-font-lock-type-face
+                    odin-font-lock-builtin-face odin-font-lock-constant-face))
+      (when (facep face)
+        (set-face-attribute face nil :family "JetBrainsMono Nerd Font")))
+
+    ;; Text mode faces (safe)
+    (dolist (face '(org-block org-code org-verbatim markdown-code-face
+                    markdown-inline-code-face markdown-pre-face))
+      (when (and (facep face) (not (my-face-should-be-protected-p face)))
+        (set-face-attribute face nil :family "JetBrainsMono Nerd Font")))
+
+    ;; Compilation faces (safe - just text)
+    (dolist (face '(compilation-info compilation-error compilation-warning
+                    compilation-line-number compilation-column-number))
+      (when (facep face)
+        (set-face-attribute face nil :family "JetBrainsMono Nerd Font")))
+
+    ;; Help faces (safe - documentation text)
+    (dolist (face '(help-key-binding help-argument-name))
+      (when (facep face)
+        (set-face-attribute face nil :family "JetBrainsMono Nerd Font")))
+
+    ;; Only safe dired faces (avoid file icons)
+    (when (facep 'dired-header)
+      (set-face-attribute 'dired-header nil :family "JetBrainsMono Nerd Font"))
+
+    ;; Terminal faces (safe - just text)
+    (dolist (face '(term ansi-term))
+      (when (facep face)
+        (set-face-attribute face nil :family "JetBrainsMono Nerd Font")))
+
+    ;; Completion text (but avoid tooltip styling)
+    (when (and (facep 'completions-common-part)
+               (not (my-face-should-be-protected-p 'completions-common-part)))
+      (set-face-attribute 'completions-common-part nil :family "JetBrainsMono Nerd Font"))
+
+    (message "JetBrains Mono font applied selectively (preserving app-specific fonts)")))
+
+;; Apply selective font enforcement immediately and after package loads
+(force-jetbrains-font-selectively)
+
+;; Selective font protection - re-enforce after any package loads
+(add-hook 'after-load-functions
+          (lambda (feature)
+            (force-jetbrains-font-selectively)))
+
+;; Re-enforce fonts after theme loads
+(add-hook 'after-init-hook 'force-jetbrains-font-selectively)
+
+;; Periodic font enforcement (less aggressive)
+(run-with-idle-timer 10 t 'force-jetbrains-font-selectively)
+
+;; Set default font to JetBrains Mono Nerd Font with Unicode support
 (when (member "JetBrainsMono Nerd Font" (font-family-list))
   (set-face-attribute 'default nil :family "JetBrainsMono Nerd Font" :height 110)
-  (set-face-attribute 'fixed-pitch nil :family "JetBrainsMono Nerd Font" :height 110))
+  (set-face-attribute 'fixed-pitch nil :family "JetBrainsMono Nerd Font" :height 110)
+
+  ;; COMPREHENSIVE UNICODE AND FONT SYSTEM
+  ;; This ensures perfect rendering of all characters and symbols
+
+  ;; Enable UTF-8 everywhere first
+  (set-language-environment "UTF-8")
+  (set-default-coding-systems 'utf-8)
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (set-file-name-coding-system 'utf-8)
+  (set-clipboard-coding-system 'utf-8)
+  (prefer-coding-system 'utf-8)
+
+  ;; Force Unicode display optimizations
+  (setq inhibit-compacting-font-caches t)      ; Never compact font caches
+  (setq use-default-font-for-symbols nil)      ; Always use fontset for symbols
+  (setq w32-enable-unicode-output t)           ; Enable Unicode output on Windows
+  (setq bidi-paragraph-direction 'left-to-right) ; Optimize for LTR text
+
+  ;; Primary font: JetBrains Mono Nerd Font for everything possible
+  (set-fontset-font t 'unicode "JetBrainsMono Nerd Font" nil 'prepend)
+
+  ;; Unicode ranges with perfect fallback chain
+  ;; Basic Latin and extensions - JetBrains first
+  (set-fontset-font t '(#x0000 . #x024F) "JetBrainsMono Nerd Font" nil 'prepend)
+  (set-fontset-font t '(#x0000 . #x024F) "Cascadia Code" nil 'append)
+  (set-fontset-font t '(#x0000 . #x024F) "Consolas" nil 'append)
+
+  ;; Mathematical symbols and operators
+  (set-fontset-font t '(#x2190 . #x21FF) "JetBrainsMono Nerd Font" nil 'prepend) ; Arrows
+  (set-fontset-font t '(#x2200 . #x22FF) "JetBrainsMono Nerd Font" nil 'prepend) ; Math operators
+  (set-fontset-font t '(#x2300 . #x23FF) "JetBrainsMono Nerd Font" nil 'prepend) ; Technical symbols
+  (set-fontset-font t '(#x25A0 . #x25FF) "JetBrainsMono Nerd Font" nil 'prepend) ; Geometric shapes
+
+  ;; Programming and technical symbols
+  (set-fontset-font t '(#xE000 . #xF8FF) "JetBrainsMono Nerd Font" nil 'prepend) ; Private use (Nerd Font icons)
+  (set-fontset-font t '(#xF0000 . #xFFFFF) "JetBrainsMono Nerd Font" nil 'prepend) ; More private use
+
+  ;; Fallback for symbols JetBrains doesn't have
+  (set-fontset-font t '(#x2000 . #x2FFF) "Segoe UI Symbol" nil 'append)  ; General punctuation & symbols
+  (set-fontset-font t '(#x2600 . #x26FF) "Segoe UI Symbol" nil 'append)  ; Miscellaneous symbols
+  (set-fontset-font t '(#x2700 . #x27BF) "Segoe UI Symbol" nil 'append)  ; Dingbats
+  (set-fontset-font t '(#x2B00 . #x2BFF) "Segoe UI Symbol" nil 'append)  ; Misc symbols and arrows
+
+  ;; Emoji support (high priority)
+  (set-fontset-font t '(#x1F000 . #x1FFFF) "Segoe UI Emoji" nil 'append) ; All emoji blocks
+  (set-fontset-font t '(#x1F300 . #x1F5FF) "Segoe UI Emoji" nil 'append) ; Misc symbols and pictographs
+  (set-fontset-font t '(#x1F600 . #x1F64F) "Segoe UI Emoji" nil 'append) ; Emoticons
+  (set-fontset-font t '(#x1F680 . #x1F6FF) "Segoe UI Emoji" nil 'append) ; Transport and map
+  (set-fontset-font t '(#x1F700 . #x1F77F) "Segoe UI Emoji" nil 'append) ; Alchemical
+  (set-fontset-font t '(#x1F780 . #x1F7FF) "Segoe UI Emoji" nil 'append) ; Geometric shapes ext
+  (set-fontset-font t '(#x1F800 . #x1F8FF) "Segoe UI Emoji" nil 'append) ; Supplemental arrows
+  (set-fontset-font t '(#x1F900 . #x1F9FF) "Segoe UI Emoji" nil 'append) ; Supplemental symbols
+
+  ;; Critical symbols that must work
+  (set-fontset-font t ?✓ "Segoe UI Symbol" nil 'append)  ; Checkmark
+  (set-fontset-font t ?✅ "Segoe UI Emoji" nil 'append)   ; Check mark button
+  (set-fontset-font t ?❌ "Segoe UI Emoji" nil 'append)   ; Cross mark
+  (set-fontset-font t ?⚠ "Segoe UI Symbol" nil 'append)   ; Warning sign
+  (set-fontset-font t ?→ "JetBrainsMono Nerd Font" nil 'prepend) ; Right arrow
+  (set-fontset-font t ?← "JetBrainsMono Nerd Font" nil 'prepend) ; Left arrow
+  (set-fontset-font t ?↑ "JetBrainsMono Nerd Font" nil 'prepend) ; Up arrow
+  (set-fontset-font t ?↓ "JetBrainsMono Nerd Font" nil 'prepend) ; Down arrow
+  (set-fontset-font t ?• "JetBrainsMono Nerd Font" nil 'prepend) ; Bullet
+  (set-fontset-font t ?◦ "JetBrainsMono Nerd Font" nil 'prepend) ; White bullet
+
+  ;; Final safety net for anything we missed
+  (set-fontset-font t 'unicode "Symbola" nil 'append)     ; Comprehensive symbol font
+  (set-fontset-font t 'unicode "DejaVu Sans" nil 'append) ; General fallback
+  (set-fontset-font t 'unicode "Arial Unicode MS" nil 'append) ; Windows Unicode fallback
+
+  ;; International character support
+  (set-fontset-font t 'latin "JetBrainsMono Nerd Font" nil 'prepend)
+  (set-fontset-font t 'greek "JetBrainsMono Nerd Font" nil 'prepend)
+  (set-fontset-font t 'cyrillic "JetBrainsMono Nerd Font" nil 'prepend))
 
 ;; Fallback fonts if JetBrains Mono Nerd Font is not available
 (unless (member "JetBrainsMono Nerd Font" (font-family-list))
@@ -208,9 +473,11 @@ Set up the Windows environment to find clangd and other development tools.
 (when (eq system-type 'windows-nt)
   (setenv "PATH" (concat "C:\\Program Files\\LLVM\\bin;"
                          "C:\\Users\\chris\\go\\bin;"
+                         "G:\\repos\\Odin;"
                          (getenv "PATH")))
   (setq exec-path (append '("C:\\Program Files\\LLVM\\bin"
-                           "C:\\Users\\chris\\go\\bin")
+                           "C:\\Users\\chris\\go\\bin"
+                           "G:\\repos\\Odin")
                          exec-path)))
 #+END_SRC
 
@@ -344,14 +611,11 @@ Configure C-specific editing preferences and style.
   (save-buffer)
   (message "File formatted and saved"))
 
-;; Format on save (optional - uncomment if you want auto-format on save)
-;; (add-hook 'c-mode-hook
-;;           (lambda ()
-;;             (add-hook 'before-save-hook 'format-buffer nil t)))
-
-;; Key bindings for formatting
-(global-set-key (kbd "C-c f") 'format-buffer)        ; Format current buffer
-(global-set-key (kbd "C-c F") 'format-and-save)      ; Format and save
+;; Key bindings for C formatting (mode-specific to avoid conflicts)
+(add-hook 'c-mode-hook
+          (lambda ()
+            (local-set-key (kbd "C-c f") 'format-buffer)
+            (local-set-key (kbd "C-c F") 'format-and-save)))
 
 ;; Auto-close compilation window on success, keep open on failure
 (defun my-compilation-finish-function (buffer status)
@@ -441,11 +705,208 @@ Configure Go development with gopls LSP and modern tooling.
 ;; Key bindings for Go formatting
 (define-key go-mode-map (kbd "C-c f") 'go-format-buffer)    ; Format Go buffer
 (define-key go-mode-map (kbd "C-c F") 'go-format-and-save)  ; Format and save
+#+END_SRC
 
-;; Auto-format Go files on save (optional - uncomment if desired)
-;; (add-hook 'go-mode-hook
-;;           (lambda ()
-;;             (add-hook 'before-save-hook 'go-format-buffer nil t)))
+** Odin Language Settings
+Configure Odin development with ols LSP and modern tooling.
+
+#+BEGIN_SRC emacs-lisp
+;; Download and install proper odin-mode from GitHub
+(let ((odin-mode-dir (expand-file-name "odin-mode" user-emacs-directory))
+      (odin-mode-file (expand-file-name "odin-mode/odin-mode.el" user-emacs-directory)))
+  (unless (file-exists-p odin-mode-file)
+    (message "Downloading odin-mode from GitHub...")
+    (make-directory odin-mode-dir t)
+    (url-copy-file "https://raw.githubusercontent.com/mattt-b/odin-mode/master/odin-mode.el"
+                   odin-mode-file t))
+
+  ;; Load the odin-mode
+  (load-file odin-mode-file)
+  (require 'odin-mode))
+
+;; Configure ols (Odin Language Server) for Odin files
+(add-to-list 'eglot-server-programs '(odin-mode . ("ols")))
+
+;; Automatically start Eglot for Odin files
+(add-hook 'odin-mode-hook 'eglot-ensure)
+
+;; Odin-specific settings with AGGRESSIVE Unicode and font support
+(add-hook 'odin-mode-hook
+          (lambda ()
+            (setq tab-width 4)                    ; Odin uses 4-space tabs
+            (setq indent-tabs-mode t)             ; Use actual tabs for Odin
+            (setq c-basic-offset 4)               ; 4-space indentation
+
+            ;; Insert header for new Odin files first
+            (insert-odin-header)
+
+            ;; NUCLEAR FONT AND UNICODE ENFORCEMENT - runs after mode is set up
+            (run-with-idle-timer 0.1 nil
+              (lambda ()
+                (with-current-buffer (current-buffer)
+                  (when (eq major-mode 'odin-mode)
+                    ;; Force UTF-8 encoding aggressively
+                    (set-buffer-file-coding-system 'utf-8-unix)
+                    (setq buffer-file-coding-system 'utf-8-unix)
+                    (prefer-coding-system 'utf-8)
+
+                    ;; FORCE JetBrains font on ALL Odin font-lock faces
+                    (when (member "JetBrainsMono Nerd Font" (font-family-list))
+                      ;; Override ALL odin font-lock faces
+                      (dolist (face '(font-lock-keyword-face font-lock-type-face
+                                      font-lock-function-name-face font-lock-variable-name-face
+                                      font-lock-constant-face font-lock-builtin-face
+                                      font-lock-string-face font-lock-comment-face
+                                      font-lock-preprocessor-face font-lock-doc-face))
+                        (when (facep face)
+                          (set-face-attribute face nil :family "JetBrainsMono Nerd Font" :height 110)))
+
+                      ;; Force buffer-specific font (nuclear option)
+                      (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
+                      (buffer-face-mode 1)
+
+                      ;; Force fontset configuration for Unicode
+                      (set-fontset-font t 'unicode "JetBrainsMono Nerd Font" nil 'prepend)
+                      (set-fontset-font t 'unicode "Segoe UI Symbol" nil 'append)
+                      (set-fontset-font t 'unicode "Segoe UI Emoji" nil 'append)
+
+                      ;; Force font for specific Unicode ranges that might fail
+                      (set-fontset-font t '(#x2190 . #x21FF) "JetBrainsMono Nerd Font" nil 'prepend) ; Arrows
+                      (set-fontset-font t '(#x2200 . #x22FF) "JetBrainsMono Nerd Font" nil 'prepend) ; Math
+                      (set-fontset-font t '(#x2500 . #x257F) "JetBrainsMono Nerd Font" nil 'prepend) ; Box drawing
+                      (set-fontset-font t '(#x2600 . #x26FF) "Segoe UI Symbol" nil 'append)         ; Misc symbols
+
+                      ;; Force redisplay
+                      (redraw-display)
+                      (font-lock-fontify-buffer)
+
+                      (message "NUCLEAR Unicode and font enforcement applied to Odin mode"))))))))
+
+;; Odin file header function
+(defun insert-odin-header ()
+  "Insert standard Odin file header for new files."
+  (when (and (buffer-file-name)
+             (= (point-min) (point-max))  ; Empty file
+             (string-match-p "\\.odin$" (buffer-file-name)))
+    (let ((filename (file-name-nondirectory (buffer-file-name)))
+          (package-name (file-name-nondirectory (directory-file-name default-directory))))
+      (insert (format "// Package %s\n" package-name))
+      (insert (format "// File: %s\n" filename))
+      (insert (format "// Author: Christer Söderlund <christer.soderlund@gmail.com>\n"))
+      (insert (format "// Date: %s\n" (format-time-string "%Y-%m-%d")))
+      (insert (format "// Copyright (c) %s Christer Söderlund\n\n" (format-time-string "%Y")))
+      (insert (format "package %s\n\n" package-name))
+      (insert "import \"core:fmt\"\n\n")
+      (insert "main :: proc() {\n")
+      (insert "    fmt.println(\"Hello, Odin!\")\n")
+      (insert "}\n")
+      (goto-char (point-min))
+      (search-forward "Package ")
+      (message "Odin header inserted - fill in package description"))))
+
+;; Odin formatting with odinfmt
+(defun odin-format-buffer ()
+  "Format Odin buffer with odinfmt."
+  (interactive)
+  (when (eq major-mode 'odin-mode)
+    (let ((start-point (point))
+          (start-line (line-number-at-pos))
+          (original-content (buffer-string)))
+      (condition-case err
+          (progn
+            (let ((formatted-content
+                   (with-temp-buffer
+                     (insert original-content)
+                     (let ((exit-code (call-process-region (point-min) (point-max)
+                                                          "odinfmt" t t nil
+                                                          "-stdin")))
+                       (if (= exit-code 0)
+                           (buffer-string)
+                         (error "odinfmt failed with exit code %d" exit-code))))))
+              (erase-buffer)
+              (insert formatted-content)
+              (goto-line start-line)
+              (message "Odin buffer formatted with odinfmt")))
+        (error
+         (erase-buffer)
+         (insert original-content)
+         (goto-char start-point)
+         (message "Odin formatting failed, buffer restored: %s" (error-message-string err)))))))
+
+;; Odin format and save
+(defun odin-format-and-save ()
+  "Format Odin buffer and save it."
+  (interactive)
+  (odin-format-buffer)
+  (save-buffer))
+
+;; Key bindings for Odin formatting
+(define-key odin-mode-map (kbd "C-c f") 'odin-format-buffer)    ; Format Odin buffer
+(define-key odin-mode-map (kbd "C-c F") 'odin-format-and-save)  ; Format and save
+
+;; Comprehensive Unicode diagnostic and fix for Odin mode
+(defun diagnose-odin-unicode-simple ()
+  "Diagnose and fix Unicode issues in Odin mode with detailed reporting."
+  (interactive)
+  (when (eq major-mode 'odin-mode)
+    (let ((issues '())
+          (fixes '()))
+
+      ;; Check current encoding
+      (let ((current-encoding buffer-file-coding-system))
+        (message "Current encoding: %s" current-encoding)
+        (unless (memq current-encoding '(utf-8 utf-8-unix utf-8-dos))
+          (push "Non-UTF-8 encoding detected" issues)
+          (set-buffer-file-coding-system 'utf-8-unix)
+          (push "Forced UTF-8 encoding" fixes)))
+
+      ;; Check current font
+      (let ((current-font (face-attribute 'default :family)))
+        (message "Current font: %s" current-font)
+        (unless (string= current-font "JetBrainsMono Nerd Font")
+          (push "Non-JetBrains font detected" issues)
+          (when (member "JetBrainsMono Nerd Font" (font-family-list))
+            (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
+            (buffer-face-mode 1)
+            (push "Forced JetBrains font" fixes))))
+
+      ;; Check fontset configuration
+      (let ((unicode-font (fontset-font t #x2192))) ; Right arrow
+        (message "Unicode arrow font: %s" unicode-font)
+        (unless (and unicode-font (string-match "JetBrains\\|Segoe" (symbol-name unicode-font)))
+          (push "Unicode fontset not configured" issues)
+          ;; Reconfigure fontset
+          (set-fontset-font t 'unicode "JetBrainsMono Nerd Font" nil 'prepend)
+          (set-fontset-font t 'unicode "Segoe UI Symbol" nil 'append)
+          (set-fontset-font t 'unicode "Segoe UI Emoji" nil 'append)
+          (push "Reconfigured Unicode fontset" fixes)))
+
+      ;; Force font-lock refresh
+      (font-lock-fontify-buffer)
+      (redraw-display)
+      (push "Refreshed display" fixes)
+
+      ;; Report results
+      (if issues
+          (message "[FIX] Issues found: %s | Fixes applied: %s"
+                   (string-join issues ", ") (string-join fixes ", "))
+        (message "[OK] No Unicode issues detected in Odin mode"))
+
+      ;; Insert test Unicode characters for verification
+      (when (and (called-interactively-p 'interactive) (not buffer-read-only))
+        (save-excursion
+          (goto-char (point-max))
+          (insert "\n// Unicode test: arrows and symbols\n")
+          (message "Test Unicode characters inserted at end of buffer"))))))
+
+;; Enhanced manual fix function
+(defun fix-odin-unicode ()
+  "Manually fix Unicode and font issues in current Odin buffer."
+  (interactive)
+  (diagnose-odin-unicode-simple))
+
+;; Add keybinding for manual Unicode fix
+(define-key odin-mode-map (kbd "C-c u") 'fix-odin-unicode)
 #+END_SRC
 
 * Build System Integration
@@ -453,14 +914,23 @@ Configure Go development with gopls LSP and modern tooling.
 Quick build, run, and debug functions for the Dream project.
 
 #+BEGIN_SRC emacs-lisp
-;; Smart build command - detects project type
+;; Enhanced smart build command - detects ALL project types with debugging
 (defun smart-build ()
-  "Build project using appropriate build system based on project type."
+  "Build project using appropriate build system based on project type with enhanced detection."
   (interactive)
-  (let* ((project-root (or (projectile-project-root) default-directory))
+  (let* ((project-root (or (condition-case nil (projectile-project-root) (error nil))
+                          default-directory))
+         (current-file (buffer-file-name))
+         (current-mode major-mode)
          (cmake-file (expand-file-name "CMakeLists.txt" project-root))
          (go-mod-file (expand-file-name "go.mod" project-root))
-         (go-files (directory-files project-root nil "\\.go$")))
+         (go-files (directory-files project-root nil "\\.go$"))
+         (odin-files (directory-files project-root nil "\\.odin$")))
+
+    ;; Debug output
+    (message "Smart Build Debug: mode=%s, root=%s, odin-files=%d, current-file=%s"
+             current-mode project-root (length odin-files)
+             (if current-file (file-name-nondirectory current-file) "none"))
 
     (cond
      ;; CMake project (like Dream)
@@ -477,6 +947,33 @@ Quick build, run, and debug functions for the Dream project.
      ((and go-files (eq major-mode 'go-mode))
       (let ((current-file (buffer-file-name)))
         (compile (format "go build -v %s" (file-name-nondirectory current-file)))))
+
+     ;; Odin project - enhanced detection and library support
+     ((or odin-files (eq major-mode 'odin-mode))
+      (let ((default-directory project-root)
+            (main-file (or (file-exists-p (expand-file-name "main.odin" project-root))
+                          (file-exists-p (expand-file-name "app.odin" project-root))))
+            (project-name (file-name-nondirectory (directory-file-name project-root))))
+        (message "Building Odin project: %s (files: %d)" project-name (length odin-files))
+        (cond
+         ;; Multi-file project with main entry point
+         ((and (> (length odin-files) 1) main-file)
+          (compile (format "odin -o %s.exe main.odin" project-name)))
+         ;; Multi-file project without clear main - use current file
+         ((> (length odin-files) 1)
+          (if current-file
+              (compile (format "odin -o %s.exe %s"
+                              (file-name-sans-extension (file-name-nondirectory current-file))
+                              (file-name-nondirectory current-file)))
+            (compile "odin -o main.exe main.odin")))
+         ;; Single file - build directly
+         ((and current-file (string-match "\\.odin$" current-file))
+          (let ((basename (file-name-sans-extension (file-name-nondirectory current-file))))
+            (compile (format "odin -o %s.exe %s"
+                            basename (file-name-nondirectory current-file)))))
+         ;; Fallback
+         (t
+          (compile "odin -o main.exe main.odin")))))
 
      ;; C file without CMake (single file compile)
      ((eq major-mode 'c-mode)
@@ -496,781 +993,54 @@ Quick build, run, and debug functions for the Dream project.
   (let ((default-directory "G:/repos/dream/"))
     (compile "cmake --build build --config Release --target dream")))
 
-;; Smart run command - detects project type and runs appropriately
-(defun smart-run ()
-  "Run project using appropriate method based on project type."
-  (interactive)
-  (let* ((project-root (or (projectile-project-root) default-directory))
-         (cmake-file (expand-file-name "CMakeLists.txt" project-root))
-         (go-mod-file (expand-file-name "go.mod" project-root))
-         (go-files (directory-files project-root nil "\\.go$")))
-
-    (cond
-     ;; Dream CMake project (specific handling)
-     ((and (file-exists-p cmake-file)
-           (string-match-p "dream" project-root))
-      (let ((exe-path (expand-file-name "build/Release/dream.exe" project-root)))
-        (if (file-exists-p exe-path)
-            (let ((default-directory project-root))
-              (async-shell-command exe-path "*Dream Output*"))
-          (message "Dream executable not found. Build first with F3."))))
-
-     ;; Generic CMake project
-     ((file-exists-p cmake-file)
-      (let* ((build-dir (expand-file-name "build" project-root))
-             (exe-files (when (file-directory-p build-dir)
-                         (directory-files-recursively build-dir "\\.exe$"))))
-        (if exe-files
-            (let ((exe-to-run (car exe-files)))  ; Use first executable found
-              (async-shell-command exe-to-run "*CMake Output*"))
-          (message "No executable found. Build first with F3."))))
-
-     ;; Go project with go.mod
-     ((file-exists-p go-mod-file)
-      (let ((default-directory project-root))
-        (async-shell-command "go run ." "*Go Output*")))
-
-     ;; Single Go file
-     ((and go-files (eq major-mode 'go-mode))
-      (let ((current-file (buffer-file-name)))
-        (async-shell-command (format "go run %s" (file-name-nondirectory current-file))
-                             "*Go Output*")))
-
-     ;; Single C file
-     ((eq major-mode 'c-mode)
-      (let* ((current-file (buffer-file-name))
-             (exe-name (file-name-sans-extension (file-name-nondirectory current-file))))
-        (if (file-exists-p (concat exe-name ".exe"))
-            (async-shell-command (format "./%s.exe" exe-name) "*C Output*")
-          (message "Executable not found. Build first with F3."))))
-
-     ;; Default fallback
-     (t
-      (message "No recognized run method for current project")))))
-
-;; Smart debug command - detects project type and debugs appropriately
-(defun smart-debug ()
-  "Debug project using appropriate debugger based on project type."
-  (interactive)
-  (let* ((project-root (or (projectile-project-root) default-directory))
-         (cmake-file (expand-file-name "CMakeLists.txt" project-root))
-         (go-mod-file (expand-file-name "go.mod" project-root))
-         (remedybg-path "C:/remedybg.exe"))
-
-    (cond
-     ;; Dream CMake project (RemedyBG)
-     ((and (file-exists-p cmake-file)
-           (string-match-p "dream" project-root))
-      (let ((exe-path (expand-file-name "build/Release/dream.exe" project-root)))
-        (if (file-exists-p exe-path)
-            (if (file-exists-p remedybg-path)
-                (async-shell-command (format "\"%s\" \"%s\"" remedybg-path exe-path))
-              (message "RemedyBG not found at C:/remedybg.exe"))
-          (message "Dream executable not found. Build first with F3."))))
-
-     ;; Generic CMake project (try RemedyBG or Visual Studio)
-     ((file-exists-p cmake-file)
-      (let* ((build-dir (expand-file-name "build" project-root))
-             (exe-files (when (file-directory-p build-dir)
-                         (directory-files-recursively build-dir "\\.exe$"))))
-        (if exe-files
-            (let ((exe-to-debug (car exe-files)))
-              (if (file-exists-p remedybg-path)
-                  (async-shell-command (format "\"%s\" \"%s\"" remedybg-path exe-to-debug))
-                (message "RemedyBG not found. Install for debugging support.")))
-          (message "No executable found for debugging. Build first with F3."))))
-
-     ;; Go project (use delve debugger)
-     ((or (file-exists-p go-mod-file) (eq major-mode 'go-mode))
-      (let ((default-directory project-root))
-        (async-shell-command "dlv debug" "*Go Debug*")))
-
-     ;; Default fallback
-     (t
-      (message "No recognized debug method for current project")))))
-
-;; Keep original dream functions for explicit use
-(defun dream-build ()
-  "Build the dream project using CMake."
-  (interactive)
-  (let ((default-directory "G:/repos/dream/"))
-    (compile "cmake --build build --config Release --target dream")))
-
+;; Dream functions are referenced by keybindings but need to be defined
 (defun dream-run ()
-  "Run the compiled dream project executable."
+  "Run the dream project executable."
   (interactive)
-  (let ((default-directory "G:/repos/dream/")
-        (exe-path "G:/repos/dream/build/Release/dream.exe"))
+  (let* ((project-root "G:/repos/dream/")
+         (exe-path (expand-file-name "build/Release/dream.exe" project-root)))
     (if (file-exists-p exe-path)
-        (async-shell-command exe-path "*Dream Output*")
-      (message "Dream executable not found. Build first with F3."))))
+        (let ((default-directory project-root))
+          (async-shell-command exe-path "*Dream Output*"))
+      (message "Dream executable not found. Build first with F5."))))
 
 (defun dream-debug ()
-  "Debug the dream project using RemedyBG."
+  "Debug the dream project with RemedyBG."
   (interactive)
-  (let ((default-directory "G:/repos/dream/")
-        (exe-path "G:/repos/dream/build/Release/dream.exe")
-        (remedybg-path "C:/remedybg.exe"))
+  (let* ((project-root "G:/repos/dream/")
+         (exe-path (expand-file-name "build/Release/dream.exe" project-root))
+         (remedybg-path "C:/remedybg.exe"))
     (if (file-exists-p exe-path)
         (if (file-exists-p remedybg-path)
             (async-shell-command (format "\"%s\" \"%s\"" remedybg-path exe-path))
           (message "RemedyBG not found at C:/remedybg.exe"))
-      (message "Dream executable not found. Build first with F3."))))
+      (message "Dream executable not found. Build first with F5."))))
 
-;; Key bindings for build/run/debug workflow
+;; Enhanced key bindings for build/run/debug workflow
 (global-set-key [f3] 'smart-build)        ; F3 = Smart Build (detects project type)
-(global-set-key [f4] 'smart-run)          ; F4 = Smart Run (detects project type)
-(global-set-key [S-f4] 'smart-debug)      ; Shift+F4 = Smart Debug (detects project type)
-
-;; Explicit Dream project functions (backup)
 (global-set-key [f5] 'dream-build)        ; F5 = Dream-specific build
 (global-set-key [f6] 'dream-run)          ; F6 = Dream-specific run
 (global-set-key [S-f6] 'dream-debug)      ; Shift+F6 = Dream-specific debug
+
+;; Build system shortcuts
+(global-set-key (kbd "C-c b b") 'smart-build)    ; Build
+(global-set-key (kbd "C-c b d") 'dream-build)    ; Dream build
 #+END_SRC
 
 * Developer Tools
-** Markdown Support
-Enhanced markdown editing with live preview and toggle view.
+** Multiple Cursors and Additional Tools
+Some additional development tools for productivity.
 
 #+BEGIN_SRC emacs-lisp
-;; Markdown mode with live preview
-(unless (package-installed-p 'markdown-mode)
-  (package-install 'markdown-mode))
-
-(unless (package-installed-p 'markdown-preview-mode)
-  (package-install 'markdown-preview-mode))
-
-(unless (package-installed-p 'grip-mode)
-  (package-install 'grip-mode))
-
-(require 'markdown-mode)
-(require 'markdown-preview-mode)
-(require 'grip-mode)
-
-;; File associations
-(add-to-list 'auto-mode-alist '("\\.md\\'" . markdown-mode))
-(add-to-list 'auto-mode-alist '("\\.markdown\\'" . markdown-mode))
-
-;; Markdown configuration - pandoc is now installed
-(setq markdown-command "pandoc")  ; Use pandoc for high-quality rendering
-(setq markdown-preview-style "github")  ; GitHub-style preview
-(setq markdown-fontify-code-blocks-natively t)  ; Syntax highlight code blocks
-
-;; Custom markdown preview function - fixed
-(defun my-markdown-toggle-preview ()
-  "Toggle between markdown source and rendered preview."
-  (interactive)
-  (if (get-buffer "*markdown-preview*")
-      (markdown-preview-cleanup)  ; Close preview
-    (markdown-preview)))         ; Open preview
-
-;; GitHub-style preview with grip (requires GitHub token for unlimited use)
-(defun my-markdown-grip-toggle ()
-  "Toggle GitHub-style preview with grip."
-  (interactive)
-  (if grip-mode
-      (grip-stop-preview)
-    (grip-start-preview)))
-
-;; Full-window markdown preview with q to quit
-(defun my-markdown-split-preview ()
-  "Show markdown preview in full window, press q to return."
-  (interactive)
-  (let ((preview-buffer "*Markdown Preview*")
-        (source-buffer (current-buffer))
-        (source-window-config (current-window-configuration)))
-
-    ;; Store the source buffer and window configuration
-    (setq markdown-preview-source-buffer source-buffer)
-    (setq markdown-preview-window-config source-window-config)
-
-    ;; Create and switch to preview buffer
-    (switch-to-buffer (get-buffer-create preview-buffer))
-
-    ;; Clear and populate preview buffer
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-      (let ((markdown-content (with-current-buffer source-buffer (buffer-string))))
-        (insert markdown-content)
-        (shell-command-on-region (point-min) (point-max) "pandoc -f markdown -t plain" t t)
-        (goto-char (point-min))
-        (deactivate-mark)))  ; Clear any selection/highlighting
-
-    ;; Set up preview mode with colorization
-    (text-mode)  ; Use text-mode as base
-    (my-markdown-colorize-preview)  ; Add custom colorization
-    (read-only-mode 1)
-    (setq buffer-read-only t)
-    (goto-char (point-min))  ; Ensure cursor at top
-    (deactivate-mark)  ; Clear selection again
-
-    ;; Local key bindings for preview
-    (use-local-map (copy-keymap (current-local-map)))
-    (local-set-key (kbd "q") 'my-markdown-preview-quit)
-    (local-set-key (kbd "r") 'my-markdown-preview-refresh)
-
-    (message "Markdown Preview - Press 'q' to quit, 'r' to refresh")))
-
-;; Colorization function for markdown preview
-(defun my-markdown-colorize-preview ()
-  "Add colorization to the markdown preview buffer."
-  (let ((inhibit-read-only t))
-    (save-excursion
-      ;; Enable font-lock mode for colorization
-      (font-lock-mode 1)
-
-      ;; Colorize function keywords (theme blue)
-      (goto-char (point-min))
-      (when (re-search-forward "\\(FUNCTION\\|function\\|def\\|struct\\)" nil t)
-        (put-text-property (match-beginning 1) (match-end 1) 'face
-                           '(:foreground "#569cd6" :weight bold)))
-
-      ;; Colorize ALL CAPS words (light gray/white)
-      (goto-char (point-min))
-      (while (re-search-forward "\\b[A-Z][A-Z_]+[A-Z]\\b" nil t)
-        (put-text-property (match-beginning 0) (match-end 0) 'face
-                           '(:foreground "#d4d4d4" :weight bold)))
-
-      ;; Colorize numbers (soft orange)
-      (goto-char (point-min))
-      (while (re-search-forward "\\b[0-9]+\\b" nil t)
-        (put-text-property (match-beginning 0) (match-end 0) 'face
-                           '(:foreground "#ce9178")))
-
-      ;; Colorize code-like patterns (theme light blue)
-      (goto-char (point-min))
-      (while (re-search-forward "\\b[a-zA-Z_][a-zA-Z0-9_]*_[a-zA-Z0-9_]*\\b" nil t)
-        (put-text-property (match-beginning 0) (match-end 0) 'face
-                           '(:foreground "#9cdcfe" :family "JetBrainsMono Nerd Font")))
-
-      ;; Colorize function calls (light white)
-      (goto-char (point-min))
-      (while (re-search-forward "\\b[a-zA-Z_][a-zA-Z0-9_]*(" nil t)
-        (put-text-property (match-beginning 0) (1- (match-end 0)) 'face
-                           '(:foreground "#dcdcdc" :family "JetBrainsMono Nerd Font")))
-
-      ;; Colorize bullet points and dashes (theme keyword blue)
-      (goto-char (point-min))
-      (while (re-search-forward "^[ ]*\\([-*•]\\|[0-9]+\\.\\)" nil t)
-        (put-text-property (match-beginning 1) (match-end 1) 'face
-                           '(:foreground "#569cd6" :weight bold)))
-
-      ;; Force redisplay
-      (font-lock-ensure))))
-
-;; Helper functions for preview mode
-(defun my-markdown-preview-quit ()
-  "Quit markdown preview and return to source buffer."
-  (interactive)
-  (when (boundp 'markdown-preview-window-config)
-    (set-window-configuration markdown-preview-window-config))
-  (when (boundp 'markdown-preview-source-buffer)
-    (switch-to-buffer markdown-preview-source-buffer))
-  (kill-buffer "*Markdown Preview*")
-  (message "Returned to markdown source"))
-
-(defun my-markdown-preview-refresh ()
-  "Refresh the markdown preview."
-  (interactive)
-  (when (boundp 'markdown-preview-source-buffer)
-    (let ((inhibit-read-only t)
-          (source-buffer markdown-preview-source-buffer))
-      (erase-buffer)
-      (let ((markdown-content (with-current-buffer source-buffer (buffer-string))))
-        (insert markdown-content)
-        (shell-command-on-region (point-min) (point-max) "pandoc -f markdown -t plain" t t)
-        (my-markdown-colorize-preview)  ; Apply colorization after refresh
-        (goto-char (point-min))
-        (deactivate-mark))  ; Clear any selection after refresh
-      (message "Preview refreshed"))))
-
-;; Key bindings for markdown
-(define-key markdown-mode-map (kbd "C-c C-p") 'my-markdown-toggle-preview)      ; Browser preview
-(define-key markdown-mode-map (kbd "C-c C-g") 'my-markdown-grip-toggle)         ; GitHub preview
-(define-key markdown-mode-map (kbd "C-c C-v") 'markdown-preview-mode)           ; Original preview mode
-(define-key markdown-mode-map (kbd "C-c C-s") 'my-markdown-split-preview)       ; Split window preview (main one)
-
-;; Auto-close preview when markdown buffer is killed
-(add-hook 'kill-buffer-hook
-          (lambda ()
-            (when (eq major-mode 'markdown-mode)
-              (markdown-preview-cleanup))))
-
-;; Enhanced markdown editing
-(add-hook 'markdown-mode-hook
-          (lambda ()
-            (visual-line-mode 1)        ; Wrap lines visually
-            ;; (flyspell-mode 1)        ; Spell checking - disabled until ispell installed
-            (setq-local fill-column 80) ; Line width for hard wrapping
-            ;; Fix ugly fonts in markdown mode - aggressive approach
-            (when (member "JetBrainsMono Nerd Font" (font-family-list))
-              (set-face-attribute 'markdown-code-face nil
-                                  :family "JetBrainsMono Nerd Font" :height 110)
-              (set-face-attribute 'markdown-inline-code-face nil
-                                  :family "JetBrainsMono Nerd Font" :height 110)
-              (set-face-attribute 'markdown-pre-face nil
-                                  :family "JetBrainsMono Nerd Font" :height 110)
-              (set-face-attribute 'fixed-pitch nil
-                                  :family "JetBrainsMono Nerd Font" :height 110)
-              ;; Force buffer-specific font
-              (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
-              (buffer-face-mode 1))))
-
-;; Live preview configuration
-(setq markdown-preview-javascript
-      (list "https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"
-            "https://cdn.jsdelivr.net/npm/prismjs@1.28.0/components/prism-core.min.js"
-            "https://cdn.jsdelivr.net/npm/prismjs@1.28.0/plugins/autoloader/prism-autoloader.min.js"))
-
-(setq markdown-preview-stylesheets
-      (list "https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.css"
-            "https://cdn.jsdelivr.net/npm/prismjs@1.28.0/themes/prism.css"))
-#+END_SRC
-
-** Window Navigation
-Fast window switching with arrow keys.
-
-#+BEGIN_SRC emacs-lisp
-;; Window navigation with Ctrl+Alt+arrows (like modern IDEs)
-(global-set-key (kbd "C-M-<left>") 'windmove-left)    ; Ctrl+Alt+Left
-(global-set-key (kbd "C-M-<right>") 'windmove-right)  ; Ctrl+Alt+Right
-(global-set-key (kbd "C-M-<up>") 'windmove-up)        ; Ctrl+Alt+Up
-(global-set-key (kbd "C-M-<down>") 'windmove-down)    ; Ctrl+Alt+Down
-
-;; Alternative: Use Shift+Arrow for window movement (if Ctrl+Alt conflicts)
-(global-set-key (kbd "S-<left>") 'windmove-left)      ; Shift+Left
-(global-set-key (kbd "S-<right>") 'windmove-right)    ; Shift+Right
-(global-set-key (kbd "S-<up>") 'windmove-up)          ; Shift+Up
-(global-set-key (kbd "S-<down>") 'windmove-down)      ; Shift+Down
-
-;; Window management shortcuts
-(global-set-key (kbd "C-x 2") 'split-window-below)    ; Split horizontally
-(global-set-key (kbd "C-x 3") 'split-window-right)    ; Split vertically
-(global-set-key (kbd "C-x 0") 'delete-window)         ; Close current window
-(global-set-key (kbd "C-x 1") 'delete-other-windows)  ; Close all other windows
-
-;; Buffer navigation (complement to window navigation)
-(global-set-key (kbd "C-<tab>") 'next-buffer)         ; Ctrl+Tab (next buffer)
-(global-set-key (kbd "C-S-<tab>") 'previous-buffer)   ; Ctrl+Shift+Tab (previous buffer)
-
-;; Improved buffer list that auto-jumps for selection
-(defun my-buffer-list-and-switch ()
-  "Show buffer list in current window for immediate selection."
-  (interactive)
-  (switch-to-buffer (list-buffers-noselect)))
-
-(global-set-key (kbd "C-x C-b") 'my-buffer-list-and-switch)  ; Auto-jump to buffer list
-
-;; Window resizing with Ctrl+Shift+arrows
-(global-set-key (kbd "C-S-<left>") 'shrink-window-horizontally)   ; Make window narrower
-(global-set-key (kbd "C-S-<right>") 'enlarge-window-horizontally) ; Make window wider
-(global-set-key (kbd "C-S-<up>") 'shrink-window)                  ; Make window shorter
-(global-set-key (kbd "C-S-<down>") 'enlarge-window)               ; Make window taller
-
-;; Enable windmove wrapping (cycle through windows)
-(setq windmove-wrap-around t)
-
-;; Disable annoying confirmation prompts
-(setq confirm-kill-emacs nil)                    ; Don't ask when exiting Emacs
-(setq confirm-kill-processes nil)                ; Don't ask when killing processes
-(setq kill-buffer-query-functions nil)          ; Don't ask when killing buffers
-(setq large-file-warning-threshold nil)         ; Don't warn about large files
-(setq vc-follow-symlinks t)                     ; Follow symlinks without asking
-(setq enable-recursive-minibuffers t)           ; Allow recursive minibuffer commands
-
-;; Disable "Buffer has a running process; kill it?" questions
-(defadvice save-buffers-kill-emacs (around no-query-kill-emacs activate)
-  "Prevent annoying 'Active processes exist' query when you quit Emacs."
-  (cl-letf (((symbol-function #'process-list) (lambda ())))
-    ad-do-it))
-
-;; Disable "Buffer modified; kill anyway?" questions
-(defun my-kill-buffer-query-function ()
-  "Don't ask questions when killing modified buffers."
-  t)
-
-(setq kill-buffer-query-functions '(my-kill-buffer-query-function))
-
-;; Fast buffer killing without questions
-(global-set-key (kbd "C-x k") 'kill-this-buffer)  ; Kill current buffer immediately
-
-;; Quick copy entire buffer with Ctrl+Backspace
-(defun copy-entire-buffer ()
-  "Copy the entire buffer to clipboard without moving cursor or changing selection."
-  (interactive)
-  (let ((current-pos (point)))
-    (save-excursion
-      (kill-ring-save (point-min) (point-max)))
-    (goto-char current-pos)
-    (deactivate-mark)
-    (message "Entire buffer copied to clipboard")))
-
-(global-set-key (kbd "C-<backspace>") 'copy-entire-buffer)  ; Ctrl+Backspace
-
-;; Smart DWIM commenting
-(defun my-comment-dwim ()
-  "Smart comment/uncomment that works on lines or regions."
-  (interactive)
-  (cond
-   ;; If region is active, comment/uncomment the region
-   ((use-region-p)
-    (comment-or-uncomment-region (region-beginning) (region-end)))
-   ;; If line is already commented, uncomment it
-   ((save-excursion
-      (beginning-of-line)
-      (looking-at "^[ \t]*//\\|^[ \t]*/\\*\\|^[ \t]*#"))
-    (comment-or-uncomment-region (line-beginning-position) (line-end-position)))
-   ;; Otherwise, comment the current line
-   (t
-    (comment-or-uncomment-region (line-beginning-position) (line-end-position)))))
-
-;; Global key binding for smart commenting
-(global-set-key (kbd "M-;") 'my-comment-dwim)     ; Meta+; (standard comment key)
-(global-set-key (kbd "C-/") 'my-comment-dwim)     ; Ctrl+/ (modern IDE style)
-(global-set-key (kbd "C-c c") 'my-comment-dwim)   ; Ctrl+c c (backup)
-#+END_SRC
-
-** File Finding & Navigation
-The most powerful file finding setup for maximum productivity.
-
-#+BEGIN_SRC emacs-lisp
-;; Vertico + Consult - Modern Telescope-like interface
-(unless (package-installed-p 'vertico)
-  (package-install 'vertico))
-
-(unless (package-installed-p 'consult)
-  (package-install 'consult))
-
-(unless (package-installed-p 'marginalia)
-  (package-install 'marginalia))
-
-(unless (package-installed-p 'orderless)
-  (package-install 'orderless))
-
-(require 'vertico)
-(require 'consult)
-(require 'marginalia)
-(require 'orderless)
-
-;; Enable Vertico (like Telescope fuzzy finder)
-(vertico-mode 1)
-
-;; Enable rich annotations in the minibuffer
-(marginalia-mode 1)
-
-;; Use orderless completion style for fuzzy matching
-(setq completion-styles '(orderless basic)
-      completion-category-defaults nil
-      completion-category-overrides '((file (styles partial-completion))))
-
-;; Telescope-like key bindings (with fallbacks)
-(if (fboundp 'consult-M-x)
-    (global-set-key (kbd "M-x") 'consult-M-x)                ; Better M-x with preview
-  (global-set-key (kbd "M-x") 'execute-extended-command))    ; Fallback to default M-x
-
-(global-set-key (kbd "C-x C-f") 'find-file)                 ; Keep standard find-file
-
-(if (fboundp 'consult-buffer)
-    (global-set-key (kbd "C-x b") 'consult-buffer)          ; Buffer switch with preview
-  (global-set-key (kbd "C-x b") 'switch-to-buffer))         ; Fallback to default
-
-(if (fboundp 'consult-recent-file)
-    (global-set-key (kbd "C-x C-r") 'consult-recent-file)   ; Recent files
-  (global-set-key (kbd "C-x C-r") 'recentf-open-files))     ; Fallback to recentf
-
-;; Everything search integration for Windows (blazing fast system-wide search)
-(when (eq system-type 'windows-nt)
-  ;; Everything search within current project
-  (defun everything-search-files (query)
-    "Search for files using Everything search engine within current project."
-    (interactive "sProject search: ")
-    (let* ((project-root (or (projectile-project-root) default-directory))
-           (search-path (replace-regexp-in-string "/" "\\\\" project-root))
-           (results (when (> (length query) 0)
-                      (split-string
-                       (shell-command-to-string
-                        (format "C:\\Users\\chris\\es.exe -n 20 \"%s\" \"%s\"" search-path query))
-                       "\n" t))))
-      (if results
-          (let ((choice (completing-read "Select file: " results)))
-            (when choice
-              (find-file choice)))
-        (message "No results found for: %s in project %s" query project-root))))
-
-  ;; Everything search with Telescope-like interface
-  (defun telescope-everything ()
-    "Everything search with Telescope-like interface."
-    (interactive)
-    (let* ((query (read-string "Everything search: "))
-           (results (when (> (length query) 0)
-                      (split-string
-                       (shell-command-to-string (format "C:\\Users\\chris\\es.exe -n 50 \"%s\"" query))
-                       "\n" t))))
-      (if results
-          (let ((choice (completing-read "Select file: " results)))
-            (when choice
-              (find-file choice)))
-        (message "No results found for: %s" query))))
-
-  ;; Text search using consult-grep (Telescope-like)
-  (defun telescope-grep ()
-    "Search text in current directory using consult-grep."
-    (interactive)
-    (consult-grep default-directory))
-
-  ;; Ripgrep text search in project
-  (defun ripgrep-search ()
-    "Search text content using ripgrep in current project."
-    (interactive)
-    (let* ((query (read-string "Ripgrep search: "))
-           (project-root (or (projectile-project-root) default-directory))
-           (cmd (format "rg --line-number --no-heading --color=never --max-count=20 \"%s\" \"%s\"" query project-root)))
-      (when (> (length query) 0)
-        (message "Searching for '%s'..." query)
-        (let ((results (split-string
-                        (shell-command-to-string cmd)
-                        "\n" t)))
-          (if results
-              (let ((choice (completing-read "Select match: " results)))
-                (when choice
-                  (let* ((parts (split-string choice ":"))
-                         (file (car parts))
-                         (line-num (string-to-number (cadr parts))))
-                    (find-file file)
-                    (goto-line line-num))))
-            (message "No matches found for: %s" query))))))
-
-  ;; Key bindings (Telescope-like interface)
-  (global-set-key (kbd "C-c s") 'telescope-everything)      ; File search with Everything (like leader ff)
-  (global-set-key (kbd "C-c S") 'telescope-grep)            ; Text search with grep
-  (global-set-key (kbd "C-c e") 'everything-search-files)   ; Everything in project
-  (global-set-key (kbd "C-c r") 'ripgrep-search)            ; Text search with ripgrep
-
-  (message "Everything search configured for Windows"))
-#+END_SRC
-
-** File Management (Dired)
-Enhanced file browser with modern features.
-
-#+BEGIN_SRC emacs-lisp
-;; Dired configuration for better file management
-(require 'dired)
-
-;; Force vertical splits for dired
-(setq split-height-threshold nil)      ; Never split horizontally
-(setq split-width-threshold 100)      ; Split vertically when window is wide enough
-
-;; Dired improvements
-(setq dired-listing-switches "-alh")   ; Human-readable sizes, show hidden files
-(setq dired-dwim-target t)             ; Guess target directory for operations
-(setq dired-recursive-copies 'always)  ; Always copy recursively
-(setq dired-recursive-deletes 'always) ; Always delete recursively
-
-;; Modern dired enhancements
-(unless (package-installed-p 'dired-sidebar)
-  (package-install 'dired-sidebar))
-
-(unless (package-installed-p 'all-the-icons)
-  (package-install 'all-the-icons))
-
-(unless (package-installed-p 'all-the-icons-dired)
-  (package-install 'all-the-icons-dired))
-
-(require 'dired-sidebar)
-(require 'all-the-icons)
-(require 'all-the-icons-dired)
-
-;; Fonts are already manually installed - skip automatic installation
-(message "all-the-icons fonts are already installed manually")
-
-;; Add icons to dired (like VS Code file explorer)
-(add-hook 'dired-mode-hook 'all-the-icons-dired-mode)
-
-;; Fallback for Windows if icons don't work
-(when (eq system-type 'windows-nt)
-  (setq all-the-icons-dired-monochrome nil))
-
-;; Dired sidebar configuration (like VS Code sidebar)
-(setq dired-sidebar-theme 'nerd)
-(setq dired-sidebar-use-term-integration t)
-(setq dired-sidebar-use-custom-font t)  ; Let sidebar use its font for icons
-
-;; Built-in dired buffer reuse (replaces dired-single)
-(setq dired-kill-when-opening-new-dired-buffer t)  ; Kill old dired buffers
-
-;; Custom functions to reuse dired buffers
-(defun my-dired-find-file ()
-  "Open file or directory in same dired buffer."
-  (interactive)
-  (let ((file (dired-get-filename)))
-    (if (file-directory-p file)
-        (find-alternate-file file)  ; Reuse buffer for directories
-      (find-file file))))          ; Open files normally
-
-(defun my-dired-up-directory ()
-  "Go to parent directory in same buffer."
-  (interactive)
-  (find-alternate-file ".."))
-
-;; Key bindings for buffer reuse
-(defun my-dired-buffer-reuse-init ()
-  "Initialize dired buffer reuse keybindings."
-  (define-key dired-mode-map [return] 'my-dired-find-file)
-  (define-key dired-mode-map "^" 'my-dired-up-directory))
-
-(add-hook 'dired-mode-hook 'my-dired-buffer-reuse-init)
-
-;; Key bindings for enhanced dired
-(global-set-key (kbd "C-x C-d") 'dired-sidebar-toggle-sidebar)  ; Toggle sidebar
-(global-set-key (kbd "C-x d") 'dired)                           ; Standard dired
-
-;; Dired customizations
-(defun my-dired-mode-setup ()
-  "Customize dired mode."
-  (dired-hide-details-mode 1)           ; Start with details hidden
-  (hl-line-mode 1)                      ; Highlight current line
-  ;; Ensure dired uses the same font as the rest of Emacs
-  (when (member "JetBrainsMono Nerd Font" (font-family-list))
-    (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
-    (buffer-face-mode 1)))
-
-(add-hook 'dired-mode-hook 'my-dired-mode-setup)
-
-;; Also fix font for all special buffers
-(defun my-ensure-consistent-font ()
-  "Ensure all buffers use the same font, except dired sidebar."
-  (when (and (member "JetBrainsMono Nerd Font" (font-family-list))
-             (not (minibufferp))
-             (not (string-match-p "\\*dired-sidebar\\*" (buffer-name))))  ; Exclude sidebar
-    (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
-    (buffer-face-mode 1)))
-
-;; Apply to ALL modes that might have font issues
-(add-hook 'help-mode-hook 'my-ensure-consistent-font)
-(add-hook 'compilation-mode-hook 'my-ensure-consistent-font)
-(add-hook 'occur-mode-hook 'my-ensure-consistent-font)
-(add-hook 'grep-mode-hook 'my-ensure-consistent-font)
-(add-hook 'shell-mode-hook 'my-ensure-consistent-font)
-(add-hook 'eshell-mode-hook 'my-ensure-consistent-font)
-(add-hook 'term-mode-hook 'my-ensure-consistent-font)
-(add-hook 'magit-mode-hook 'my-ensure-consistent-font)
-(add-hook 'markdown-mode-hook 'my-ensure-consistent-font)
-(add-hook 'text-mode-hook 'my-ensure-consistent-font)
-(add-hook 'prog-mode-hook 'my-ensure-consistent-font)
-(add-hook 'fundamental-mode-hook 'my-ensure-consistent-font)
-(add-hook 'special-mode-hook 'my-ensure-consistent-font)
-(add-hook 'minibuffer-setup-hook
-          (lambda ()
-            (when (member "JetBrainsMono Nerd Font" (font-family-list))
-              (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
-              (buffer-face-mode 1))))
-
-;; Global font lock to prevent other packages from changing fonts
-(defadvice set-face-font (around preserve-jetbrains-font activate)
-  "Prevent other packages from changing our JetBrains Mono font."
-  (unless (member face '(mode-line mode-line-inactive))
-    (when (member "JetBrainsMono Nerd Font" (font-family-list))
-      (setq ad-return-value nil)  ; Block the font change
-      (message "Font change blocked to preserve JetBrains Mono"))))
-
-;; Force font consistency after package loads
-(add-hook 'after-init-hook
-          (lambda ()
-            (when (member "JetBrainsMono Nerd Font" (font-family-list))
-              (set-face-attribute 'default nil :family "JetBrainsMono Nerd Font" :height 110)
-              (set-face-attribute 'fixed-pitch nil :family "JetBrainsMono Nerd Font" :height 110)
-              (set-face-attribute 'variable-pitch nil :family "JetBrainsMono Nerd Font" :height 110)
-              (message "Font consistency enforced globally"))))
-
-;; Fix font for daemon-created frames (Windows-specific fix)
-(add-hook 'after-make-frame-functions
-          (lambda (frame)
-            (with-selected-frame frame
-              ;; Force font detection refresh for new frames
-              (when (display-graphic-p frame)
-                (cond
-                 ;; Try JetBrains Mono Nerd Font first
-                 ((member "JetBrainsMono Nerd Font" (font-family-list))
-                  (set-face-attribute 'default frame :family "JetBrainsMono Nerd Font" :height 110)
-                  (set-face-attribute 'fixed-pitch frame :family "JetBrainsMono Nerd Font" :height 110)
-                  (message "Applied JetBrains Mono to new frame"))
-                 ;; Fallback to Cascadia Code
-                 ((member "Cascadia Code" (font-family-list))
-                  (set-face-attribute 'default frame :family "Cascadia Code" :height 110)
-                  (message "Applied Cascadia Code to new frame"))
-                 ;; Fallback to Consolas
-                 ((member "Consolas" (font-family-list))
-                  (set-face-attribute 'default frame :family "Consolas" :height 110)
-                  (message "Applied Consolas to new frame"))
-                 (t
-                  (message "No preferred fonts found for new frame")))))))
-
-;; Additional daemon font fix - run when client connects
-(defun fix-daemon-font ()
-  "Fix font issues in daemon mode."
-  (interactive)
-  (when (display-graphic-p)
-    (cond
-     ((member "JetBrainsMono Nerd Font" (font-family-list))
-      (set-face-attribute 'default nil :family "JetBrainsMono Nerd Font" :height 110)
-      (message "JetBrains Mono applied"))
-     ((member "Cascadia Code" (font-family-list))
-      (set-face-attribute 'default nil :family "Cascadia Code" :height 110)
-      (message "Cascadia Code applied"))
-     (t
-      (message "Using system default font")))))
-
-;; Key binding to manually fix font if needed
-(global-set-key (kbd "C-c M-f") 'fix-daemon-font)
-
-;; Quick file operations
-(defun dired-open-file-external ()
-  "Open file with external application."
-  (interactive)
-  (let ((file (dired-get-filename)))
-    (call-process-shell-command (format "start \"\" \"%s\"" file))))
-
-(define-key dired-mode-map (kbd "E") 'dired-open-file-external)
-
-;; Better window splitting behavior for all buffers
-(defun my-split-window-sensibly (&optional window)
-  "Custom window splitting that prefers vertical splits."
-  (let ((window (or window (selected-window))))
-    (or (and (window-splittable-p window t)
-             (split-window window nil 'right))
-        (and (window-splittable-p window)
-             (split-window window)))))
-
-(setq split-window-preferred-function 'my-split-window-sensibly)
-#+END_SRC
-
-** Project Management
-Project navigation and management tools.
-
-#+BEGIN_SRC emacs-lisp
-;; Projectile for project navigation and management
-(unless (package-installed-p 'projectile)
-  (package-install 'projectile))
-
-(require 'projectile)
-(projectile-mode +1)
-
-;; Integrate Projectile with Consult for Telescope-like navigation
-(unless (package-installed-p 'consult-projectile)
-  (package-install 'consult-projectile))
-
-(require 'consult-projectile)
-
-;; Telescope-like key bindings for Projectile
-(define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
-(global-set-key (kbd "C-c p f") 'consult-projectile-find-file)     ; Find file in project (like Telescope)
-(global-set-key (kbd "C-c p p") 'consult-projectile-switch-project) ; Switch project
-(global-set-key (kbd "C-c p s g") 'consult-projectile-grep)        ; Search in project
-
-
-;; Magit for Git integration
-(unless (package-installed-p 'magit)
-  (package-install 'magit))
+;; Multiple cursors for efficient editing
+(unless (package-installed-p 'multiple-cursors)
+  (package-install 'multiple-cursors))
+
+(require 'multiple-cursors)
+(global-set-key (kbd "C-S-c C-S-c") 'mc/edit-lines)
+(global-set-key (kbd "C->") 'mc/mark-next-like-this)
+(global-set-key (kbd "C-<") 'mc/mark-previous-like-this)
+(global-set-key (kbd "C-c C-<") 'mc/mark-all-like-this)
 
 ;; Company for better autocompletion
 (unless (package-installed-p 'company)
@@ -1288,65 +1058,102 @@ Project navigation and management tools.
 (require 'which-key)
 (which-key-mode)
 
-;; Multiple cursors for efficient editing
-(unless (package-installed-p 'multiple-cursors)
-  (package-install 'multiple-cursors))
+;; Magit for Git integration
+(unless (package-installed-p 'magit)
+  (package-install 'magit))
 
-(require 'multiple-cursors)
-(global-set-key (kbd "C-S-c C-S-c") 'mc/edit-lines)
-(global-set-key (kbd "C->") 'mc/mark-next-like-this)
-(global-set-key (kbd "C-<") 'mc/mark-previous-like-this)
-(global-set-key (kbd "C-c C-<") 'mc/mark-all-like-this)
+(global-set-key (kbd "C-x g") 'magit-status)
 
-;; Rainbow brackets for better code structure visualization
-(unless (package-installed-p 'rainbow-delimiters)
-  (package-install 'rainbow-delimiters))
+;; Quick copy entire buffer with Ctrl+Backspace
+(defun copy-entire-buffer ()
+  "Copy the entire buffer to clipboard without moving cursor or changing selection."
+  (interactive)
+  (let ((current-pos (point)))
+    (save-excursion
+      (kill-ring-save (point-min) (point-max)))
+    (goto-char current-pos)
+    (deactivate-mark)
+    (message "Entire buffer copied to clipboard")))
 
-(require 'rainbow-delimiters)
+(global-set-key (kbd "C-<backspace>") 'copy-entire-buffer)
 
-;; Enable rainbow brackets in programming modes
-(add-hook 'prog-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'c-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'go-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'emacs-lisp-mode-hook 'rainbow-delimiters-mode)
-(add-hook 'lisp-interaction-mode-hook 'rainbow-delimiters-mode)
+;; Smart commenting
+(defun my-comment-dwim ()
+  "Smart comment/uncomment that works on lines or regions."
+  (interactive)
+  (cond
+   ;; If region is active, comment/uncomment the region
+   ((use-region-p)
+    (comment-or-uncomment-region (region-beginning) (region-end)))
+   ;; If line is already commented, uncomment it
+   ((save-excursion
+      (beginning-of-line)
+      (looking-at "^[ \t]*//\\|^[ \t]*/\\*\\|^[ \t]*#"))
+    (comment-or-uncomment-region (line-beginning-position) (line-end-position)))
+   ;; Otherwise, comment the current line
+   (t
+    (comment-or-uncomment-region (line-beginning-position) (line-end-position)))))
 
-;; Configure rainbow colors to match voidlight theme
-(with-eval-after-load 'rainbow-delimiters
-  (set-face-foreground 'rainbow-delimiters-depth-1-face "#569cd6")    ; Blue
-  (set-face-foreground 'rainbow-delimiters-depth-2-face "#4ec9b0")    ; Cyan
-  (set-face-foreground 'rainbow-delimiters-depth-3-face "#9cdcfe")    ; Light blue
-  (set-face-foreground 'rainbow-delimiters-depth-4-face "#b5cea8")    ; Green
-  (set-face-foreground 'rainbow-delimiters-depth-5-face "#ce9178")    ; Orange
-  (set-face-foreground 'rainbow-delimiters-depth-6-face "#d4d4d4")    ; Light gray
-  (set-face-foreground 'rainbow-delimiters-depth-7-face "#c586c0")    ; Purple
-  (set-face-foreground 'rainbow-delimiters-depth-8-face "#dcdcaa")    ; Yellow
-  (set-face-foreground 'rainbow-delimiters-depth-9-face "#f44747"))   ; Red
+(global-set-key (kbd "C-/") 'my-comment-dwim)
+
+;; Disable annoying confirmation prompts
+(setq confirm-kill-emacs nil)
+(setq confirm-kill-processes nil)
+(setq kill-buffer-query-functions nil)
+(setq large-file-warning-threshold nil)
+(setq vc-follow-symlinks t)
+(setq enable-recursive-minibuffers t)
+
+;; Force kill Emacs without prompts
+(defun my-force-kill-emacs ()
+  "Force kill Emacs without any prompts about modified buffers or processes."
+  (interactive)
+  (let ((kill-buffer-query-functions nil)
+        (confirm-kill-processes nil)
+        (confirm-kill-emacs nil))
+    ;; Kill all processes without asking
+    (dolist (proc (process-list))
+      (when (process-live-p proc)
+        (delete-process proc)))
+    ;; Mark all buffers as unmodified to avoid save prompts
+    (dolist (buffer (buffer-list))
+      (with-current-buffer buffer
+        (set-buffer-modified-p nil)))
+    ;; Now exit
+    (kill-emacs)))
+
+(global-set-key (kbd "C-x C-c") 'my-force-kill-emacs)
+
+;; Better buffer navigation
+(global-set-key (kbd "C-<tab>") 'next-buffer)
+(global-set-key (kbd "C-S-<tab>") 'previous-buffer)
+
+;; Window management
+(global-set-key (kbd "C-x 2") 'split-window-below)
+(global-set-key (kbd "C-x 3") 'split-window-right)
+(global-set-key (kbd "C-x 0") 'delete-window)
+(global-set-key (kbd "C-x 1") 'delete-other-windows)
 #+END_SRC
 
 * Usage Notes
 ** Key Bindings
 *** Build/Run/Debug
-- =F3= - Build Dream project
-- =F4= - Run Dream project
-- =Shift+F4= - Debug Dream project in RemedyBG
+- =F3= - Smart Build (detects project type)
+- =F5= - Dream-specific build
+- =F6= - Dream-specific run
+- =Shift+F6= - Dream-specific debug
 
-*** File Finding & Navigation (Helm-powered)
-- =C-x C-f= - Find files (Helm fuzzy matching)
-- =C-x b= - Switch buffers (with recent files)
-- =C-x C-r= - Recent files
-- =M-x= - Enhanced command palette
-- =C-c p f= - Find file in project (fuzzy)
-- =C-c p p= - Switch between projects
-- =C-c e= - Everything search (system-wide on Windows)
+*** Dashboard & Navigation
+- =C-c d= - Open interactive dashboard
+- =C-c s c= - Create/switch to scratch buffer
 
-*** Text Search
-- =C-c s= - File search with Everything (system-wide)
-- =C-c S= - Text search in current directory (grep)
-- =C-c p s g= - Search text in project (Helm + grep)
+*** File Finding & Navigation
+- =C-x C-f= - Find files
+- =C-x b= - Switch buffers
+- =M-x= - Command palette
 
 *** LSP Navigation
-- =M-x eglot= - Start LSP server for current C file (auto-starts)
+- =M-x eglot= - Start LSP server for current file (auto-starts)
 - =M-.= - Go to definition (when LSP is active)
 - =M-,= - Go back from definition
 
@@ -1360,16 +1167,32 @@ Project navigation and management tools.
 - =C-c C-<= - Mark all like this
 
 ** LSP Features
-When Eglot is active in a C file, you get:
+When Eglot is active in a file, you get:
 - Code completion
 - Go to definition/declaration
 - Find references
 - Real-time diagnostics
 - Hover documentation
 
-** Build Integration
-The F3 build command will:
-- Switch to the Dream project directory
-- Run CMake build with Release configuration
-- Show build output in a compilation buffer
-- Allow clicking on errors to jump to source locations
+## Build Integration
+The build commands automatically detect your project type and use the appropriate build system.
+
+* Auto Focus System
+** Automatic Window Focusing
+#+BEGIN_SRC emacs-lisp
+;; Load auto-focus module for better UX
+(let ((auto-focus-module (expand-file-name "modules/auto-focus.org" user-emacs-directory)))
+  (when (file-exists-p auto-focus-module)
+    (condition-case err
+        (org-babel-load-file auto-focus-module)
+      (error
+       (message "Failed to load auto-focus module: %s" (error-message-string err))))))
+
+;; Load Windows Unicode fix (critical for proper Unicode display)
+(let ((unicode-module (expand-file-name "modules/windows-unicode-fix.org" user-emacs-directory)))
+  (when (file-exists-p unicode-module)
+    (condition-case err
+        (org-babel-load-file unicode-module)
+      (error
+       (message "Failed to load Unicode fix module: %s" (error-message-string err))))))
+#+END_SRC

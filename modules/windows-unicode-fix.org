@@ -1,0 +1,152 @@
+#+TITLE: Windows Unicode Fix Module
+#+AUTHOR: Chris
+#+DESCRIPTION: Proper Unicode support for Emacs 30.2 on Windows 11
+#+STARTUP: overview
+
+* Windows 11 Unicode Fix
+
+** Core Unicode Configuration
+#+BEGIN_SRC emacs-lisp
+;; Windows 11 + Emacs 30.2 specific Unicode configuration
+(when (eq system-type 'windows-nt)
+  ;; Force UTF-8 everywhere
+  (set-language-environment "UTF-8")
+  (setq locale-coding-system 'utf-8)
+  (set-default-coding-systems 'utf-8)
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (set-selection-coding-system 'utf-8)
+  (prefer-coding-system 'utf-8)
+
+  ;; Critical Windows 11 Unicode settings
+  (setq w32-unicode-filenames t)
+  (setq w32-enable-unicode-output t)
+  (setq inhibit-compacting-font-caches t)
+  (setq use-default-font-for-symbols nil)
+
+  ;; Configure emoji and symbol fontsets for Windows 11
+  (set-fontset-font t 'emoji
+                    (cond
+                     ((member "Segoe UI Emoji" (font-family-list)) "Segoe UI Emoji")
+                     ((member "Noto Color Emoji" (font-family-list)) "Noto Color Emoji")
+                     ((member "Apple Color Emoji" (font-family-list)) "Apple Color Emoji")))
+
+  (set-fontset-font t 'symbol
+                    (cond
+                     ((member "Segoe UI Symbol" (font-family-list)) "Segoe UI Symbol")
+                     ((member "Symbola" (font-family-list)) "Symbola")))
+
+  ;; Specific Unicode ranges for Windows 11
+  (set-fontset-font t '(#x1F300 . #x1F5FF) "Segoe UI Symbol")   ; Misc symbols
+  (set-fontset-font t '(#x1F600 . #x1F64F) "Segoe UI Emoji")    ; Emoticons
+  (set-fontset-font t '(#x1F680 . #x1F6FF) "Segoe UI Emoji")    ; Transport
+  (set-fontset-font t '(#x2190 . #x21FF) "Segoe UI Symbol")     ; Arrows
+  (set-fontset-font t '(#x2200 . #x22FF) "Segoe UI Symbol")     ; Math operators
+  (set-fontset-font t '(#x2500 . #x257F) "Segoe UI Symbol")     ; Box drawing
+  (set-fontset-font t '(#x2600 . #x26FF) "Segoe UI Symbol")     ; Misc symbols
+
+  (message "Windows 11 Unicode configuration applied"))
+#+END_SRC
+
+** Unicode Test Function
+#+BEGIN_SRC emacs-lisp
+(defun test-unicode-display ()
+  "Test Unicode character display in current buffer."
+  (interactive)
+  (let ((test-chars '("→" "←" "↑" "↓" "•" "◦" "✓" "✗" "≠" "≤" "≥" "α" "β" "γ" "λ" "π")))
+    (with-current-buffer (get-buffer-create "*Unicode Test*")
+      (erase-buffer)
+      (insert "=== Unicode Display Test ===\n\n")
+      (insert "If you see squares or missing characters, Unicode is not working properly.\n\n")
+
+      (dolist (char test-chars)
+        (insert (format "%s - U+%04X - %s\n"
+                        char
+                        (string-to-char char)
+                        (char-to-name (string-to-char char)))))
+
+      (insert "\n=== Math and Technical Symbols ===\n")
+      (insert "∀ ∃ ∈ ∉ ∪ ∩ ⊂ ⊃ ⊆ ⊇ ∧ ∨ ¬ ⇒ ⇔\n")
+
+      (insert "\n=== Box Drawing ===\n")
+      (insert "┌─┐ │ │ └─┘ ┬ ┴ ├ ┤ ┼\n")
+
+      (goto-char (point-min))
+      (display-buffer (current-buffer))
+      (select-window (get-buffer-window (current-buffer))))
+
+    (message "Unicode test buffer created - check for proper symbol display")))
+
+(global-set-key (kbd "C-c u t") 'test-unicode-display)
+#+END_SRC
+
+** Font Detection and Debugging
+#+BEGIN_SRC emacs-lisp
+(defun debug-font-unicode ()
+  "Debug font and Unicode configuration."
+  (interactive)
+  (let ((results '()))
+
+    ;; Check available fonts
+    (push (format "Available fonts: %d" (length (font-family-list))) results)
+
+    ;; Check specific fonts
+    (dolist (font '("JetBrainsMono Nerd Font" "Segoe UI Emoji" "Segoe UI Symbol"))
+      (if (member font (font-family-list))
+          (push (format "%s: AVAILABLE" font) results)
+        (push (format "%s: MISSING" font) results)))
+
+    ;; Check current fontset for specific characters
+    (let ((arrow-font (fontset-font t ?→))
+          (bullet-font (fontset-font t ?•))
+          (check-font (fontset-font t ?✓)))
+      (push (format "Arrow (→) font: %s" arrow-font) results)
+      (push (format "Bullet (•) font: %s" bullet-font) results)
+      (push (format "Check (✓) font: %s" check-font) results))
+
+    ;; Check coding systems
+    (push (format "Default coding: %s" default-buffer-file-coding-system) results)
+    (push (format "Terminal coding: %s" terminal-coding-system) results)
+
+    ;; Display results
+    (with-current-buffer (get-buffer-create "*Font Unicode Debug*")
+      (erase-buffer)
+      (insert "=== Font and Unicode Debug ===\n\n")
+      (dolist (result (reverse results))
+        (insert (format "%s\n" result)))
+      (goto-char (point-min))
+      (display-buffer (current-buffer))
+      (select-window (get-buffer-window (current-buffer))))
+
+    (message "Font Unicode debug completed")))
+
+(global-set-key (kbd "C-c u d") 'debug-font-unicode)
+#+END_SRC
+
+** Universal Unicode Fix
+#+BEGIN_SRC emacs-lisp
+(defun fix-unicode-everywhere ()
+  "Apply Unicode fix to all modes and buffers."
+  (interactive)
+  ;; Re-apply Windows Unicode configuration
+  (when (eq system-type 'windows-nt)
+    ;; Force fontset reconfiguration
+    (set-fontset-font t 'emoji "Segoe UI Emoji" nil 'prepend)
+    (set-fontset-font t 'symbol "Segoe UI Symbol" nil 'prepend)
+
+    ;; Force specific ranges
+    (set-fontset-font t '(#x2190 . #x21FF) "Segoe UI Symbol" nil 'prepend) ; Arrows
+    (set-fontset-font t '(#x2022 . #x2022) "Segoe UI Symbol" nil 'prepend) ; Bullet
+    (set-fontset-font t '(#x2713 . #x2713) "Segoe UI Symbol" nil 'prepend) ; Check mark
+
+    ;; Refresh all buffers
+    (dolist (buffer (buffer-list))
+      (with-current-buffer buffer
+        (when (derived-mode-p 'prog-mode 'text-mode 'org-mode)
+          (font-lock-fontify-buffer))))
+
+    (redraw-display)
+    (message "Unicode fix applied to all buffers")))
+
+(global-set-key (kbd "C-c u f") 'fix-unicode-everywhere)
+#+END_SRC

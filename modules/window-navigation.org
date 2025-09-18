@@ -1,0 +1,85 @@
+#+TITLE: Window Navigation Module
+#+AUTHOR: Chris
+#+DESCRIPTION: Enhanced window and buffer navigation
+#+STARTUP: overview
+
+* Window Navigation Module
+
+** Window Movement
+#+BEGIN_SRC emacs-lisp
+;; Window navigation with arrows
+(global-set-key (kbd "C-M-<left>") 'windmove-left)
+(global-set-key (kbd "C-M-<right>") 'windmove-right)
+(global-set-key (kbd "C-M-<up>") 'windmove-up)
+(global-set-key (kbd "C-M-<down>") 'windmove-down)
+
+;; Alternative with Shift+Arrow
+(global-set-key (kbd "S-<left>") 'windmove-left)
+(global-set-key (kbd "S-<right>") 'windmove-right)
+(global-set-key (kbd "S-<up>") 'windmove-up)
+(global-set-key (kbd "S-<down>") 'windmove-down)
+
+;; Window management
+(global-set-key (kbd "C-x 2") 'split-window-below)
+(global-set-key (kbd "C-x 3") 'split-window-right)
+(global-set-key (kbd "C-x 0") 'delete-window)
+(global-set-key (kbd "C-x 1") 'delete-other-windows)
+
+;; Enable windmove wrapping
+(setq windmove-wrap-around t)
+#+END_SRC
+
+** Buffer Navigation
+#+BEGIN_SRC emacs-lisp
+;; Buffer navigation
+(global-set-key (kbd "C-<tab>") 'next-buffer)
+(global-set-key (kbd "C-S-<tab>") 'previous-buffer)
+
+;; Window resizing
+(global-set-key (kbd "C-S-<left>") 'shrink-window-horizontally)
+(global-set-key (kbd "C-S-<right>") 'enlarge-window-horizontally)
+(global-set-key (kbd "C-S-<up>") 'shrink-window)
+(global-set-key (kbd "C-S-<down>") 'enlarge-window)
+
+;; Quick buffer operations
+(defun copy-entire-buffer ()
+  "Copy the entire buffer to clipboard."
+  (interactive)
+  (let ((current-pos (point)))
+    (save-excursion
+      (kill-ring-save (point-min) (point-max)))
+    (goto-char current-pos)
+    (deactivate-mark)
+    (message "Entire buffer copied to clipboard")))
+
+(global-set-key (kbd "C-<backspace>") 'copy-entire-buffer)
+#+END_SRC
+
+** Tests
+#+BEGIN_SRC emacs-lisp
+(defun test-window-navigation-module ()
+  "Test window navigation module."
+  (interactive)
+  (let ((results '()))
+
+    ;; Test function definitions
+    (dolist (func '(copy-entire-buffer))
+      (if (fboundp func)
+          (push (format "%s: DEFINED" func) results)
+        (push (format "%s: MISSING" func) results)))
+
+    ;; Test key bindings
+    (dolist (key '("C-M-<left>" "S-<left>" "C-<tab>" "C-<backspace>"))
+      (let ((binding (key-binding (kbd key))))
+        (push (format "%s -> %s" key binding) results)))
+
+    ;; Display results
+    (with-current-buffer (get-buffer-create "*Window Navigation Test*")
+      (erase-buffer)
+      (insert "=== Window Navigation Test ===\n\n")
+      (dolist (result (reverse results))
+        (insert (format "%s\n" result)))
+      (display-buffer (current-buffer)))
+
+    (message "Window navigation test completed")))
+#+END_SRC

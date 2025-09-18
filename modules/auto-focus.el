@@ -1,0 +1,122 @@
+;; Auto-switch to new windows containing lists or special buffers
+(defun auto-focus-new-window (buffer &optional window)
+  "Automatically focus new windows with buffer lists or special content."
+  (when buffer
+    (let ((buffer-name (buffer-name buffer)))
+      ;; Check if it's a list/special buffer we want to auto-focus
+      (when (or (string-match-p "\\*.*\\*" buffer-name)          ; Any *buffer*
+                (string-match-p "list\\|List" buffer-name)       ; Any list buffer
+                (string-match-p "completion\\|Completion" buffer-name) ; Completion buffers
+                (string-match-p "helm\\|vertico\\|ivy" buffer-name)    ; Completion frameworks
+                (string-match-p "projectile\\|project" buffer-name)    ; Project buffers
+                (string-match-p "grep\\|search\\|find" buffer-name)    ; Search results
+                (string-match-p "compilation\\|compile" buffer-name)   ; Build output
+                (string-match-p "magit\\|git" buffer-name)             ; Git buffers
+                (string-match-p "help\\|apropos\\|describe" buffer-name)) ; Help buffers
+        (let ((target-window (or window (get-buffer-window buffer))))
+          (when target-window
+            (select-window target-window)
+            (message "Auto-focused on: %s" buffer-name))))))
+
+;; Hook into display-buffer to auto-focus new windows
+(add-to-list 'display-buffer-alist
+             '("\\*.*\\*" (display-buffer-reuse-window display-buffer-pop-up-window)
+               (post-command . auto-focus-new-window)))
+
+;; Universal 'q' quit function for all special buffers
+(defun universal-quit-window ()
+  "Quit current window/buffer intelligently."
+  (interactive)
+  (cond
+   ;; If it's a temporary/special buffer, kill it and close window
+   ((or (string-match-p "\\*.*\\*" (buffer-name))
+        (eq major-mode 'help-mode)
+        (eq major-mode 'compilation-mode)
+        (eq major-mode 'grep-mode)
+        (eq major-mode 'occur-mode)
+        (eq major-mode 'apropos-mode)
+        (eq major-mode 'package-menu-mode))
+    (quit-window t))  ; Kill buffer and close window
+
+   ;; If it's a regular file buffer in a split window, just close window
+   ((> (length (window-list)) 1)
+    (delete-window))
+
+   ;; Last window with regular buffer - bury it
+   (t
+    (bury-buffer))))
+
+;; Apply universal 'q' to all special modes
+(defun setup-universal-quit ()
+  "Set up universal 'q' quit behavior for current buffer."
+  (local-set-key (kbd "q") 'universal-quit-window))
+
+;; Add to various mode hooks
+(add-hook 'help-mode-hook 'setup-universal-quit)
+(add-hook 'compilation-mode-hook 'setup-universal-quit)
+(add-hook 'occur-mode-hook 'setup-universal-quit)
+(add-hook 'grep-mode-hook 'setup-universal-quit)
+(add-hook 'apropos-mode-hook 'setup-universal-quit)
+(add-hook 'package-menu-mode-hook 'setup-universal-quit)
+(add-hook 'magit-mode-hook 'setup-universal-quit)
+(add-hook 'special-mode-hook 'setup-universal-quit)
+
+;; Also set up for custom test result buffers
+(defun setup-quit-for-test-buffers ()
+  "Set up 'q' to quit for our custom test result buffers."
+  (when (string-match-p "\\*.*Test.*\\*" (buffer-name))
+    (local-set-key (kbd "q") 'universal-quit-window)))
+
+(add-hook 'after-change-major-mode-hook 'setup-quit-for-test-buffers)
+
+;; Enhanced buffer list that auto-focuses and has 'q' to quit
+(defun my-enhanced-buffer-list ()
+  "Show buffer list and automatically switch to it."
+  (interactive)
+  (let ((buffer-list-buffer (list-buffers-noselect)))
+    (switch-to-buffer-other-window buffer-list-buffer)
+    (select-window (get-buffer-window buffer-list-buffer))
+    ;; Set up 'q' to quit in buffer list
+    (local-set-key (kbd "q") 'universal-quit-window)
+    (message "Buffer list opened - press 'q' to close")))
+
+(global-set-key (kbd "C-x C-b") 'my-enhanced-buffer-list)
+
+;; Auto-focus behavior for common Emacs commands
+(advice-add 'list-buffers :after
+            (lambda (&rest args)
+              (when (get-buffer "*Buffer List*")
+                (switch-to-buffer "*Buffer List*"))))
+
+(advice-add 'apropos :after
+            (lambda (&rest args)
+              (when (get-buffer "*Apropos*")
+                (switch-to-buffer "*Apropos*"))))
+
+(defun test-auto-focus-module ()
+  "Test auto focus module functionality."
+  (interactive)
+  (let ((results '()))
+
+    ;; Test function definitions
+    (dolist (func '(universal-quit-window auto-focus-new-window my-enhanced-buffer-list))
+      (if (fboundp func)
+          (push (format "%s: DEFINED" func) results)
+        (push (format "%s: MISSING" func) results)))
+
+    ;; Test key bindings
+    (let ((buffer-list-binding (key-binding (kbd "C-x C-b"))))
+      (push (format "C-x C-b -> %s" buffer-list-binding) results))
+
+    ;; Display results
+    (with-current-buffer (get-buffer-create "*Auto Focus Test*")
+      (erase-buffer)
+      (insert "=== Auto Focus Module Test ===\n\n")
+      (dolist (result (reverse results))
+        (insert (format "%s\n" result)))
+      (local-set-key (kbd "q") 'universal-quit-window)  ; Test 'q' behavior here
+      (goto-char (point-min))
+      (display-buffer (current-buffer))
+      (select-window (get-buffer-window (current-buffer))))
+
+    (message "Auto focus test completed - try pressing 'q' in the test buffer")))

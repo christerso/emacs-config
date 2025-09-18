@@ -1,0 +1,73 @@
+(defun diagnose-odin-unicode-simple ()
+  "Fix Unicode and font issues in Odin mode."
+  (interactive)
+  (when (eq major-mode 'odin-mode)
+    ;; Force UTF-8 encoding
+    (set-buffer-file-coding-system 'utf-8-unix)
+
+    ;; Force JetBrains font
+    (when (member "JetBrainsMono Nerd Font" (font-family-list))
+      (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
+      (buffer-face-mode 1)
+
+      ;; Force Unicode fontset
+      (set-fontset-font t 'unicode "JetBrainsMono Nerd Font" nil 'prepend)
+      (set-fontset-font t 'unicode "Segoe UI Symbol" nil 'append)
+      (set-fontset-font t 'unicode "Segoe UI Emoji" nil 'append)
+
+      ;; Refresh display
+      (font-lock-fontify-buffer)
+      (redraw-display)
+      (message "Unicode and fonts fixed in Odin buffer"))))
+
+(defun setup-odin-unicode-hook ()
+  "Set up Unicode and font support for Odin mode."
+  ;; FORCE JETBRAINS FONT AND UNICODE IN ODIN MODE
+  (when (member "JetBrainsMono Nerd Font" (font-family-list))
+    ;; Set buffer-specific font
+    (setq buffer-face-mode-face '(:family "JetBrainsMono Nerd Font" :height 110))
+    (buffer-face-mode 1)
+
+    ;; Force all text to use JetBrains font
+    (set-face-attribute 'default nil :family "JetBrainsMono Nerd Font" :height 110)
+
+    ;; Ensure Unicode works in this buffer
+    (set-buffer-file-coding-system 'utf-8)
+    (setq buffer-file-coding-system 'utf-8)
+
+    ;; Force fontset for this buffer
+    (set-fontset-font t 'unicode "JetBrainsMono Nerd Font" nil 'prepend)
+    (set-fontset-font t 'unicode "Segoe UI Symbol" nil 'append)
+    (set-fontset-font t 'unicode "Segoe UI Emoji" nil 'append)
+
+    (message "JetBrains font and Unicode enforced in Odin mode")))
+
+(defun test-odin-unicode-module ()
+  "Test the Odin Unicode module functions."
+  (interactive)
+  (let ((test-results '()))
+
+    ;; Test 1: Check if functions are defined
+    (if (fboundp 'diagnose-odin-unicode-simple)
+        (push "diagnose-odin-unicode-simple: DEFINED" test-results)
+      (push "diagnose-odin-unicode-simple: MISSING" test-results))
+
+    (if (fboundp 'setup-odin-unicode-hook)
+        (push "setup-odin-unicode-hook: DEFINED" test-results)
+      (push "setup-odin-unicode-hook: MISSING" test-results))
+
+    ;; Test 2: Check font availability
+    (if (member "JetBrainsMono Nerd Font" (font-family-list))
+        (push "JetBrains font: AVAILABLE" test-results)
+      (push "JetBrains font: MISSING" test-results))
+
+    ;; Display results
+    (with-current-buffer (get-buffer-create "*Odin Unicode Test Results*")
+      (erase-buffer)
+      (insert "=== Odin Unicode Module Test Results ===\n\n")
+      (dolist (result (reverse test-results))
+        (insert (format "%s\n" result)))
+      (goto-char (point-min))
+      (display-buffer (current-buffer)))
+
+    (message "Odin Unicode module test completed - check *Odin Unicode Test Results* buffer")))

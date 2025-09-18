@@ -1,0 +1,123 @@
+(defvar emacs-config-modules-dir
+  (expand-file-name "modules" user-emacs-directory)
+  "Directory containing modular configuration files.")
+
+(defun load-config-module (module-name)
+  "Safely load a configuration module with error handling."
+  (let ((module-file (expand-file-name (concat module-name ".org") emacs-config-modules-dir)))
+    (if (file-exists-p module-file)
+        (condition-case err
+            (progn
+              (message "Loading module: %s" module-name)
+              (org-babel-load-file module-file)
+              (message "[OK] Module loaded: %s" module-name)
+              t) ; Return success
+          (error
+           (message "[ERROR] Failed to load module %s: %s" module-name (error-message-string err))
+           nil)) ; Return failure
+      (progn
+        (message "[SKIP] Module not found: %s" module-name)
+        nil))))
+
+(defun load-all-config-modules ()
+  "Load all available configuration modules."
+  (interactive)
+  (when (file-directory-p emacs-config-modules-dir)
+    (let ((modules '())
+          (loaded-count 0)
+          (failed-count 0))
+
+      ;; Find all .org modules
+      (dolist (file (directory-files emacs-config-modules-dir nil "\\.org$"))
+        (let ((module-name (file-name-sans-extension file)))
+          (unless (string= module-name "module-loader") ; Don't load self
+            (push module-name modules))))
+
+      ;; Load each module
+      (dolist (module modules)
+        (if (load-config-module module)
+            (setq loaded-count (1+ loaded-count))
+          (setq failed-count (1+ failed-count))))
+
+      (message "Module loading complete: %d loaded, %d failed" loaded-count failed-count)
+      (list loaded-count failed-count))))
+
+(defun test-config-module (module-name)
+  "Test a specific configuration module before loading."
+  (interactive "sModule name: ")
+  (let ((module-file (expand-file-name (concat module-name ".org") emacs-config-modules-dir)))
+    (if (file-exists-p module-file)
+        (condition-case err
+            (progn
+              (message "Testing module: %s" module-name)
+              ;; Test org-babel parsing without executing
+              (with-temp-buffer
+                (insert-file-contents module-file)
+                (org-mode)
+                (org-babel-map-src-blocks module-file
+                  (message "Found code block in %s" module-name)))
+              (message "[OK] Module syntax valid: %s" module-name)
+              t)
+          (error
+           (message "[ERROR] Module syntax invalid %s: %s" module-name (error-message-string err))
+           nil))
+      (message "[ERROR] Module not found: %s" module-name))))
+
+(defvar emacs-config-module-registry
+  '(("core-packages" . "Essential development packages (Projectile, Vertico, Eglot)")
+    ("font-system" . "JetBrains font enforcement and Unicode support")
+    ("window-navigation" . "Enhanced window and buffer navigation")
+    ("file-management" . "Treemacs and file browsing tools")
+    ("language-support" . "Multi-language development support (C, Odin)")
+    ("workspace-management" . "Multi-project workspace system")
+    ("odin-unicode" . "Unicode and font support for Odin mode")
+    ("enhanced-build" . "Enhanced build system with library support"))
+  "Registry of available configuration modules.")
+
+(defun list-available-modules ()
+  "List all available configuration modules."
+  (interactive)
+  (with-current-buffer (get-buffer-create "*Config Modules*")
+    (erase-buffer)
+    (insert "=== Available Configuration Modules ===\n\n")
+
+    (dolist (module emacs-config-module-registry)
+      (let ((name (car module))
+            (desc (cdr module))
+            (file (expand-file-name (concat (car module) ".org") emacs-config-modules-dir)))
+        (insert (format "[%s] %s\n    %s\n    File: %s\n\n"
+                        (if (file-exists-p file) "EXISTS" "MISSING")
+                        name desc file))))
+
+    (goto-char (point-min))
+    (display-buffer (current-buffer))))
+
+(defun validate-all-modules ()
+  "Validate syntax of all configuration modules without loading them."
+  (interactive)
+  (when (file-directory-p emacs-config-modules-dir)
+    (let ((valid-count 0)
+          (invalid-count 0)
+          (results '()))
+
+      (dolist (module-info emacs-config-module-registry)
+        (let ((module-name (car module-info)))
+          (if (test-config-module module-name)
+              (progn
+                (setq valid-count (1+ valid-count))
+                (push (format "[OK] %s" module-name) results))
+            (progn
+              (setq invalid-count (1+ invalid-count))
+              (push (format "[ERROR] %s" module-name) results)))))
+
+      ;; Display results
+      (with-current-buffer (get-buffer-create "*Module Validation*")
+        (erase-buffer)
+        (insert "=== Module Validation Results ===\n\n")
+        (dolist (result (reverse results))
+          (insert (format "%s\n" result)))
+        (insert (format "\nSummary: %d valid, %d invalid\n" valid-count invalid-count))
+        (goto-char (point-min))
+        (display-buffer (current-buffer)))
+
+      (message "Validation complete: %d valid, %d invalid" valid-count invalid-count))))
