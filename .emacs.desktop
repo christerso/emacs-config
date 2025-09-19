@@ -1,0 +1,55 @@
+;; -*- mode: emacs-lisp; lexical-binding:t; coding: utf-8-emacs; -*-
+;; --------------------------------------------------------------------------
+;; Desktop File for Emacs
+;; --------------------------------------------------------------------------
+;; Created Sat Sep 20 00:34:45 2025
+;; Desktop file format version 208
+;; Emacs version 30.2
+
+;; Global section:
+(setq desktop-saved-frameset (vector 'frameset 1 '(26829 55941 860921 0) '(desktop . "208") "chris@HEXIC" nil nil (list (list (list '(minibuffer . t) '(undecorated) '(skip-taskbar) '(font . "-outline-JetBrainsMonoNL NFM-regular-normal-normal-mono-15-*-*-*-c-*-iso8859-1") '(border-width . 0) '(internal-border-width . 0) '(child-frame-border-width) '(right-divider-width . 0) '(bottom-divider-width . 0) '(vertical-scroll-bars) '(horizontal-scroll-bars) '(foreground-color . "#c5c8ce") '(background-color . "#000000") '(mouse-color . "black") '(border-color . "black") '(screen-gamma) '(line-spacing) '(left-fringe . 8) '(right-fringe . 8) '(no-focus-on-map) '(no-accept-focus) '(no-special-glyphs) '(alpha-background) '(alpha) '(menu-bar-lines . 0) '(tab-bar-lines . 0) '(height . 72) '(tool-bar-lines . 0) '(inhibit-double-buffering) '(title) '(icon-type) '(auto-raise) '(auto-lower) '(cursor-type . box) '(scroll-bar-width . 17) '(scroll-bar-height . 17) '(fullscreen . maximized) '(z-group) '(visibility . t) '(scroll-bar-foreground) '(scroll-bar-background) '(display-type . color) '(background-mode . dark) '(cursor-color . "#d98e1d") '(font-parameter) '(environment) '(persp--modestring "[" #("main" 0 4 (face persp-selected-face)) "]") '(persp--recursive) '(persp--last) (desktop-list* 'persp--curr (record 'perspective "main" '("Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity" "Unprintable entity") nil nil '(26829 54613 688916 0) '(26829 54613 688917 0) "Unprintable entity" (let ((mk (make-marker))) (add-hook 'desktop-delay-hook (lambda nil (set-marker mk 1 (get-buffer "*scratch*")))) mk))) '(persp--hash . "Unprintable entity") '(last-focus-update . t) '(frameset--id . "4D9E-8637-9D8D-1201") '(frameset--mini t . t) '(modeline . t) '(unsplittable) '(icon-name) '(display . "w32") '(explicit-name) '(tool-bar-position . top) '(width . 282) '(left + -8) '(top + -8)) '((min-height . 4) (min-width . 10) (min-height-ignore . 2) (min-width-ignore . 4) (min-height-safe . 1) (min-width-safe . 2) (min-pixel-height . 76) (min-pixel-width . 90) (min-pixel-height-ignore . 38) (min-pixel-width-ignore . 36) (min-pixel-height-safe . 19) (min-pixel-width-safe . 18)) 'leaf '(pixel-width . 2560) '(pixel-height . 1350) '(total-width . 284) '(total-height . 71) '(normal-height . 1.0) '(normal-width . 1.0) '(buffer "game_main.c" (selected . t) (hscroll . 0) (fringes 8 8 nil nil) (margins nil) (scroll-bars nil 0 t nil 0 t nil) (vscroll . 0) (dedicated) (point . 3510) (start . 2397)) '(prev-buffers ("game_main.h" 4347 6008) ("game_main.c" 2397 3388) ("dashboard.org" 1 9577) ("*scratch*" 1 1))))))
+(setq desktop-missing-file-warning nil)
+(setq tags-file-name nil)
+(setq tags-table-list nil)
+(setq search-ring nil)
+(setq regexp-search-ring nil)
+(setq register-alist nil)
+(setq file-name-history '("g:/repos/rift/src/game/game_main.c" "~/.emacs.d/dashboard.org" "g:/repos/rift/src/game/game_main.h" "g:/repos/rift/src/game/game_main.c" "~/.emacs.d/.cache/treemacs-persist" "~/.emacs.d/modules/language-support.org" "g:/repos/arc/internal/ai/behaviors.go" "g:/repos/rift/src/math/math_2d.h" "g:/repos/rift/src/game/game_types.h" "g:/repos/nan/src/editor/editor.odin" "~/.emacs.d/modules/project-builds.org" "g:/repos/arc/docs/LOVECRAFTIAN_UI_THEME.md" "g:/repos/arc/DEV.md" "~/.emacs.d/modules/core-packages.org" "g:/repos/nan/.rules" "g:/repos/nan/src/core/core.odin" "~/.emacs.d/modules/enhanced-build.org" "~/.emacs.d/modules/enhanced-build.el" "g:/repos/arc/internal/audio/music_manager.go" "g:/repos/arc/cmd/config/audio_settings.json" "~/.emacs.d/modules/windows-unicode-fix.org" "~/.emacs.d/modules/workspace-management.org" "~/.emacs.d/modules/file-management.org" "~/.emacs.d/modules/font-system.org" "~/.emacs.d/init.el" "g:/repos/Odin/core/log/log.odin" "g:/repos/neontech/main.cpp" "g:/repos/nan/src/math/math.odin" "g:/repos/nan/src/world/world.odin" "g:/repos/Odin/base/runtime/core.odin" "g:/repos/Odin/core/fmt/fmt.odin"))
+
+;; Buffer section -- buffers listed in same order as in buffer list:
+(desktop-create-buffer 208
+  "g:/repos/rift/src/game/game_main.c"
+  "game_main.c"
+  'c-mode
+  '(eglot-inlay-hints-mode eldoc-mode flymake-mode eglot--managed-mode font-lock-mode display-line-numbers-mode company-mode)
+  3510
+  '(3388 nil)
+  nil
+  nil
+  '((buffer-display-time 26829 54672 933294 0) (buffer-file-coding-system . undecided-dos))
+  '((mark-ring nil)))
+
+(desktop-create-buffer 208
+  "g:/repos/rift/src/game/game_main.h"
+  "game_main.h"
+  'c-mode
+  '(font-lock-mode display-line-numbers-mode company-mode eglot-inlay-hints-mode eldoc-mode flymake-mode eglot--managed-mode)
+  6008
+  '(nil nil)
+  nil
+  nil
+  '((buffer-display-time 26829 54668 211836 0) (buffer-file-coding-system . undecided-dos))
+  '((mark-ring nil)))
+
+(desktop-create-buffer 208
+  "c:/Users/chris/AppData/Roaming/.emacs.d/dashboard.org"
+  "dashboard.org"
+  'org-mode
+  '(company-mode display-line-numbers-mode font-lock-mode)
+  9577
+  '(9577 nil)
+  nil
+  nil
+  '((tab-width . 8) (buffer-display-time 26829 54672 633858 0) (buffer-file-coding-system . utf-8-dos) (truncate-lines . t))
+  '((mark-ring nil)))
+

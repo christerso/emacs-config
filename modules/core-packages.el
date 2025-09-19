@@ -18,10 +18,6 @@
 (unless (package-installed-p 'orderless)
   (package-install 'orderless))
 
-;; Install a.el for advanced header/implementation switching
-(unless (package-installed-p 'a)
-  (package-install 'a))
-
 ;; Load and configure
 (require 'vertico)
 (require 'consult)
@@ -119,10 +115,254 @@
                         (when (re-search-forward "^[0-9]+:" nil t)
                           (beginning-of-line)))))))
 
-;; Ripgrep keybindings - now using proper rg package
-(global-set-key (kbd "C-c r") 'my-ripgrep-project)           ; C-c r = ripgrep project with jump capability
+;; Enhanced ripgrep with preview like xref
+(defun my-ripgrep-with-preview (pattern)
+  "Search with ripgrep and show results with interactive preview."
+  (interactive (list (read-string "Ripgrep search: ")))
+  (message "Starting ripgrep search for: %s" pattern)
+  (let ((project-root (or (and (fboundp 'projectile-project-root)
+                               (projectile-project-root))
+                          (locate-dominating-file default-directory ".git")
+                          default-directory)))
+    (message "Project root: %s" project-root)
+    (rg-search-with-preview pattern "." project-root)))
+
+(defun rg-search-with-preview (pattern files-pattern directory)
+  "Run ripgrep and show results with preview."
+  (let* ((buf (get-buffer-create "*rg-preview*"))
+         (original-window (selected-window))
+         (original-buffer (current-buffer))
+         (results '())
+         (default-directory directory))
+
+    ;; Run ripgrep and parse results
+    (with-temp-buffer
+      (let ((exit-code (call-process "rg" nil t nil
+                                     "--line-number"
+                                     "--column"
+                                     "--no-heading"
+                                     "--max-depth" "10"
+                                     "--glob" "!test_area/src/*"
+                                     "--glob" "!build/*"
+                                     "--glob" "!.git/*"
+                                     pattern
+                                     ".")))
+        (if (not (= exit-code 0))
+            (message "Ripgrep failed with exit code %d. Output: %s" exit-code (buffer-string))
+          (message "Ripgrep found results, parsing...")))
+
+      (goto-char (point-min))
+      (while (not (eobp))
+        (when (looking-at "\\([^:]+\\):\\([0-9]+\\):\\([0-9]+\\):\\(.*\\)")
+          (let ((file-path (match-string 1)))
+            ;; Convert relative path to absolute path
+            (unless (file-name-absolute-p file-path)
+              (setq file-path (expand-file-name file-path directory)))
+            (push (list file-path  ; absolute file path
+                       (string-to-number (match-string 2))  ; line
+                       (string-to-number (match-string 3))  ; column
+                       (match-string 4)) ; content
+                  results)))
+        (forward-line 1)))
+
+    (setq results (reverse results))
+    (message "Found %d ripgrep results" (length results))
+
+    (when results
+      (with-current-buffer buf
+        (setq buffer-read-only nil)
+        (erase-buffer)
+        (insert "Navigate with ↑/↓, jump with RET, quit with q\n")
+        (insert "─────────────────────────────────────────────────\n\n")
+
+        ;; Store data as buffer-local variables
+        (setq-local rg-preview-list results)
+        (setq-local rg-preview-index 0)
+        (setq-local rg-preview-original-window original-window)
+        (setq-local rg-preview-original-buffer original-buffer)
+        (setq-local rg-preview-current-overlay nil)
+
+        ;; Prevent auto-focus interference
+        (setq-local auto-focus-disabled t)
+
+        ;; Insert results
+        (dolist (result results)
+          (let ((file (nth 0 result))
+                (line (nth 1 result))
+                (content (nth 3 result)))
+            (insert (format "%s:%d: %s\n"
+                           (file-name-nondirectory file)
+                           line
+                           content))))
+
+        (goto-char (point-min))
+        (forward-line 3) ; Skip header
+        (setq buffer-read-only t)
+
+        ;; Define local keymap
+        (let ((map (make-sparse-keymap)))
+          (define-key map (kbd "<up>") 'rg-preview-up)
+          (define-key map (kbd "<down>") 'rg-preview-down)
+          (define-key map (kbd "p") 'rg-preview-up)
+          (define-key map (kbd "n") 'rg-preview-down)
+          (define-key map (kbd "<return>") 'rg-preview-jump)
+          (define-key map (kbd "RET") 'rg-preview-jump)
+          (define-key map (kbd "q") 'rg-preview-quit)
+          (define-key map (kbd "C-g") 'rg-preview-quit)
+          (define-key map (kbd "<escape>") 'rg-preview-quit)
+          (use-local-map map)
+          (message "Applied rg-preview keymap to buffer %s" (buffer-name)))
+
+        ;; Force the buffer into a special mode to ensure keymap sticks
+        (setq major-mode 'rg-preview-mode)
+        (setq mode-name "RG-Preview"))
+
+      ;; Display the buffer in bottom window
+      (display-buffer buf '(display-buffer-at-bottom . ((window-height . 15))))
+      (select-window (get-buffer-window buf))
+
+      ;; Show initial preview in main window
+      (rg-preview-update-display)
+
+      ;; Clear any selection mode
+      (deactivate-mark)
+      (setq mark-active nil)
+      (setq-local transient-mark-mode nil)
+      (setq-local cua-mode nil))))
+
+(defun rg-preview-up ()
+  "Move to previous rg result."
+  (interactive)
+  (when (> rg-preview-index 0)
+    (setq rg-preview-index (1- rg-preview-index))
+    (rg-preview-update-display)))
+
+(defun rg-preview-down ()
+  "Move to next rg result."
+  (interactive)
+  (when (< rg-preview-index (1- (length rg-preview-list)))
+    (setq rg-preview-index (1+ rg-preview-index))
+    (rg-preview-update-display)))
+
+(defun rg-preview-jump ()
+  "Jump to selected rg result."
+  (interactive)
+  (let ((result (nth rg-preview-index rg-preview-list))
+        (orig-win rg-preview-original-window)
+        (current-win (selected-window))
+        (current-buf (current-buffer))
+        (current-overlay rg-preview-current-overlay))
+
+    ;; Clean up highlight overlay
+    (when (and current-overlay (overlay-buffer current-overlay))
+      (delete-overlay current-overlay))
+
+    ;; Kill the preview buffer
+    (set-buffer-modified-p nil)
+    (kill-buffer current-buf)
+
+    ;; Close the preview window
+    (when (> (length (window-list)) 1)
+      (delete-window current-win))
+
+    ;; Jump to the location in the main window
+    (when (window-live-p orig-win)
+      (select-window orig-win))
+    (find-file (nth 0 result))
+    (goto-char (point-min))
+    (forward-line (1- (nth 1 result)))
+    (move-to-column (1- (nth 2 result)))))
+
+(defun rg-preview-quit ()
+  "Quit rg preview."
+  (interactive)
+  (let ((orig-buf rg-preview-original-buffer)
+        (orig-win rg-preview-original-window)
+        (current-buf (current-buffer))
+        (current-win (selected-window))
+        (current-overlay rg-preview-current-overlay))
+
+    ;; Clean up highlight overlay
+    (when (and current-overlay (overlay-buffer current-overlay))
+      (delete-overlay current-overlay))
+
+    ;; Force kill the current buffer
+    (set-buffer-modified-p nil)
+    (kill-buffer current-buf)
+
+    ;; Close the window if it's not the only one
+    (when (> (length (window-list)) 1)
+      (delete-window current-win))
+
+    ;; Restore original state
+    (when (window-live-p orig-win)
+      (select-window orig-win))
+    (when (buffer-live-p orig-buf)
+      (switch-to-buffer orig-buf))))
+
+(defun rg-preview-update-display ()
+  "Update the display and preview."
+  (let ((buf (current-buffer)))
+    ;; Update selection highlighting
+    (with-current-buffer buf
+      (setq buffer-read-only nil)
+      (goto-char (point-min))
+      (forward-line 3) ; Skip header
+
+      ;; Remove previous highlighting
+      (remove-overlays (point) (point-max) 'face)
+
+      ;; Add highlighting to current line
+      (forward-line rg-preview-index)
+      (let ((overlay (make-overlay (line-beginning-position) (line-end-position))))
+        (overlay-put overlay 'face 'highlight))
+
+      (setq buffer-read-only t))
+
+    ;; Update preview in main window
+    (when (< rg-preview-index (length rg-preview-list))
+      (rg-preview-show-location-in-main (nth rg-preview-index rg-preview-list) rg-preview-original-window))))
+
+(defun rg-preview-show-location-in-main (result original-window)
+  "Show ripgrep result in the main window."
+  (let* ((file (nth 0 result))
+         (line (nth 1 result))
+         (column (nth 2 result))
+         (preview-buf (get-buffer "*rg-preview*")))
+
+    (with-selected-window original-window
+
+      ;; Clean up previous overlay first
+      (when (and preview-buf
+                 (buffer-local-value 'rg-preview-current-overlay preview-buf))
+        (let ((old-overlay (buffer-local-value 'rg-preview-current-overlay preview-buf)))
+          (when (and old-overlay (overlay-buffer old-overlay))
+            (delete-overlay old-overlay))))
+
+      (find-file file)
+      (goto-char (point-min))
+      (forward-line (1- line))
+      (move-to-column (1- column))
+      (recenter)
+
+      ;; Create highlight overlay for the line in main window
+      (let ((overlay (make-overlay (line-beginning-position) (line-end-position))))
+        (overlay-put overlay 'face '(:background "#3a3a3a" :foreground "white"))
+
+        ;; Store the overlay reference in the preview buffer for cleanup
+        (when preview-buf
+          (with-current-buffer preview-buf
+            (setq-local rg-preview-current-overlay overlay)))))))
+
+;; Ripgrep keybindings - now with preview
+(global-set-key (kbd "C-c r") 'my-ripgrep-with-preview)     ; C-c r = ripgrep project with preview
 (global-set-key (kbd "C-c R") 'my-ripgrep-current-dir)      ; C-c R = ripgrep current directory
 (global-set-key (kbd "C-c g") 'rg-menu)                     ; C-c g = ripgrep menu for advanced options
+
+;; Header/Implementation switcher - use ff-find-other-file (built-in)
+;; This is more reliable than external packages
+(global-set-key (kbd "C-x z") 'ff-find-other-file)
+(message "Header/implementation switcher (ff-find-other-file) configured (C-x z)")
 
 ;; Debug: Show what's actually bound
 (message "C-x C-r bound to: %s" (key-binding (kbd "C-x C-r")))
@@ -167,59 +407,3 @@
       (display-buffer (current-buffer)))
 
     (message "Core packages test completed")))
-
-;; C/C++ Header/Implementation Toggle
-;; Configure both projectile and a.el for header switching
-
-;; Load a.el for advanced header/implementation switching
-(require 'a)
-
-;; Configure ff-find-other-file (built-in) for C/C++
-(setq ff-other-file-alist
-      '(("\\.cc\\'" (".hh" ".h"))
-        ("\\.hh\\'" (".cc" ".C" ".cpp"))
-        ("\\.c\\'" (".h"))
-        ("\\.h\\'" (".c" ".cc" ".C" ".cpp"))
-        ("\\.C\\'" (".H" ".hh" ".h"))
-        ("\\.H\\'" (".C" ".CC"))
-        ("\\.cpp\\'" (".hpp" ".hh" ".h"))
-        ("\\.hpp\\'" (".cpp" ".c"))
-        ("\\.cxx\\'" (".hxx" ".hh" ".h"))
-        ("\\.hxx\\'" (".cxx"))))
-
-;; Configure search paths
-(setq ff-search-directories
-      '("." "../src" "../include" "../inc" "../../src" "../../include"
-        "../../../src" "../../../include"))
-
-;; Smart toggle function that tries multiple methods
-(defun toggle-c-header-implementation ()
-  "Toggle between C/C++ header and implementation files using multiple methods."
-  (interactive)
-  (let ((current-file (buffer-file-name)))
-    (when current-file
-      (cond
-       ;; Try projectile first (if available and in project)
-       ((and (fboundp 'projectile-project-root)
-             (projectile-project-root)
-             (fboundp 'projectile-find-other-file))
-        (condition-case nil
-            (projectile-find-other-file)
-          (error
-           (message "Projectile couldn't find other file, trying ff-find-other-file...")
-           (ff-find-other-file))))
-
-       ;; Try a.el
-       ((fboundp 'a-find-other-file)
-        (condition-case nil
-            (a-find-other-file)
-          (error
-           (message "a.el couldn't find other file, trying ff-find-other-file...")
-           (ff-find-other-file))))
-
-       ;; Fallback to built-in ff-find-other-file
-       (t
-        (ff-find-other-file))))))
-
-;; Bind to C-x z
-(global-set-key (kbd "C-x z") 'toggle-c-header-implementation)

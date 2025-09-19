@@ -1,1 +1,1 @@
-("g:/repos/rift/" "g:/repos/arc/" "g:/repos/nan/" "g:/repos/dream/" "g:/repos/Odin/" "~/" "~/.emacs.d/" "~/AppData/Roaming/.emacs.d/" "g:/repos/gaze/")
+("g:/repos/nan/" "~/.emacs.d/" "g:/repos/Odin/" "g:/repos/rift/" "g:/repos/arc/" "g:/repos/dream/" "~/" "~/AppData/Roaming/.emacs.d/" "g:/repos/gaze/")

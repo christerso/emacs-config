@@ -19,22 +19,47 @@
                   (interactive)
                   (kill-buffer (current-buffer))))
 
-;; Dashboard
-(setq initial-major-mode 'org-mode)
+;; Persistent scratch buffer
+(setq initial-major-mode 'lisp-interaction-mode)
 (setq initial-buffer-choice
       (lambda ()
-        (let ((dashboard-file (expand-file-name "dashboard.org" user-emacs-directory)))
-          (if (file-exists-p dashboard-file)
-              (find-file-noselect dashboard-file)
-            (get-buffer-create "*Dashboard*")))))
+        (let ((scratch-file (expand-file-name "scratch.el" user-emacs-directory)))
+          (if (file-exists-p scratch-file)
+              (progn
+                (find-file-noselect scratch-file)
+                (set-buffer-major-mode (get-file-buffer scratch-file) 'lisp-interaction-mode))
+            (get-buffer-create "*scratch*")))))
 
-(defun open-dashboard ()
-  "Open dashboard."
+(defun save-scratch ()
+  "Save scratch buffer to persistent file."
   (interactive)
-  (find-file (expand-file-name "dashboard.org" user-emacs-directory)))
+  (let ((scratch-file (expand-file-name "scratch.el" user-emacs-directory))
+        (scratch-buffer (get-buffer "*scratch*")))
+    (when scratch-buffer
+      (with-current-buffer scratch-buffer
+        (write-region (point-min) (point-max) scratch-file)
+        (message "Scratch buffer saved to %s" scratch-file)))))
+
+(defun load-scratch ()
+  "Load scratch buffer from persistent file."
+  (interactive)
+  (let ((scratch-file (expand-file-name "scratch.el" user-emacs-directory)))
+    (if (file-exists-p scratch-file)
+        (with-current-buffer (get-buffer-create "*scratch*")
+          (erase-buffer)
+          (insert-file-contents scratch-file)
+          (lisp-interaction-mode)
+          (message "Scratch buffer loaded from %s" scratch-file))
+      (message "No saved scratch buffer found"))))
+
+;; Auto-save scratch on exit
+(add-hook 'kill-emacs-hook 'save-scratch)
+
+;; Load scratch on startup
+(add-hook 'emacs-startup-hook 'load-scratch)
 
 ;; Essential keys
-(global-set-key (kbd "C-c d") 'open-dashboard)
+(global-set-key (kbd "C-c d") 'save-scratch)
 (global-set-key (kbd "C-x C-r") 'recentf-open-files)
 
 (recentf-mode 1)
@@ -66,7 +91,10 @@
 (dolist (module '("core-packages"     ; Vertico, Consult, Company
                   "theme-system"       ; Dark theme and colors
                   "font-system"        ; Font enforcement
-                  "language-support"   ; Odin, C, CMake, Go
+                  "xref-preview"       ; Interactive xref navigation
+                  "c-cpp-support"      ; C and C++ development
+                  "odin-support"       ; Odin language support
+                  "language-support"   ; Additional language support
                   "file-management"    ; Treemacs, Everything search
                   "window-navigation"  ; Window movement
                   "workspace-management" ; Project workspaces
@@ -85,4 +113,52 @@
         (error
          (message "✗ FAILED: %s - %s" module (error-message-string err)))))))
 
-(message "=== CONFIG LOADING COMPLETE ===")
+;; Enhanced error reporting for failed modules
+  (run-with-timer 2.0 nil
+                  (lambda ()
+                    (let ((loaded-modules 0)
+                          (failed-modules '())
+                          (messages (with-current-buffer "*Messages*"
+                                       (buffer-string))))
+
+                      ;; Parse the messages buffer to find loaded and failed modules
+                      (with-temp-buffer
+                        (insert messages)
+                        (goto-char (point-min))
+                        (while (re-search-forward "^✓ LOADED: \\(.+\\)$" nil t)
+                          (setq loaded-modules (1+ loaded-modules)))
+                        (goto-char (point-min))
+                        (while (re-search-forward "^✗ FAILED: \\(.+\\) - \\(.+\\)$" nil t)
+                          (push (list (match-string 1) (match-string 2)) failed-modules)))
+
+                      ;; Display comprehensive report
+                      (message "=== MODULE LOADING REPORT ===")
+                      (message "✓ Successfully loaded: %d modules" loaded-modules)
+                      (message "✗ Failed to load: %d modules" (length failed-modules))
+
+                      ;; Show failed modules prominently
+                      (when failed-modules
+                        (dolist (failure failed-modules)
+                          (message "🚨 FAILED: %s (%s)" (car failure) (cadr failure)))
+
+                        ;; Create dedicated failed modules buffer for high visibility
+                        (with-current-buffer (get-buffer-create "*FAILED MODULES*")
+                          (setq buffer-read-only nil)
+                          (erase-buffer)
+                          (insert "!!! FAILED EMACS MODULES !!!\n")
+                          (insert "==============================\n\n")
+                          (insert (format "Total modules loaded: %d\n" loaded-modules))
+                          (insert (format "Failed modules: %d\n\n" (length failed-modules)))
+                          (insert "FAILED MODULES:\n")
+                          (insert "----------------\n")
+                          (dolist (failure failed-modules)
+                            (insert (format "🚨 %s\n   Error: %s\n\n" (car failure) (cadr failure))))
+                          (insert "\nPlease check these modules and fix any issues.\n")
+                          (setq buffer-read-only t))
+
+                        ;; Display the failed modules buffer
+                        (display-buffer "*FAILED MODULES*")
+                        (message "🚨 FAILED MODULES DETECTED - See *FAILED MODULES* buffer"))
+
+                      (unless failed-modules
+                        (message "✓ ALL MODULES LOADED SUCCESSFULLY")))))
