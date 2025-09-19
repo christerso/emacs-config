@@ -1,0 +1,18 @@
+g:/repos/rift/main.c
+g:/repos/rift/#main.c#
+g:/repos/rift/src/interior.h
+g:/repos/rift/src/#interior.h#
+g:/repos/rift/src/logger.c
+g:/repos/rift/src/#logger.c#
+g:/repos/rift/src/logger.h
+g:/repos/rift/src/#logger.h#
+c:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt/stdio.h
+c:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt/#stdio.h#
+g:/repos/arc/cmd/main.go
+g:/repos/arc/cmd/#main.go#
+g:/repos/nan/src/main.odin
+g:/repos/nan/src/#main.odin#
+c:/Users/chris/AppData/Roaming/.emacs.d/dashboard.org
+c:/Users/chris/AppData/Roaming/.emacs.d/#dashboard.org#
+c:/Users/chris/AppData/Roaming/.emacs.d/.cache/treemacs-persist
+c:/Users/chris/AppData/Roaming/.emacs.d/.cache/#treemacs-persist#

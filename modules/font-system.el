@@ -1,0 +1,197 @@
+(defvar my-protected-face-patterns
+  '("icon" "treemacs" "all-the-icons" "nerd-icons" "dired-directory"
+    "magit-diff" "git-gutter" "flycheck" "company-tooltip" "lsp-ui"
+    "rainbow-delimiters" "hl-line" "region" "isearch" "lazy-highlight"
+    "show-paren" "cursor" "fringe" "vertical-border")
+  "Face name patterns that should not be modified by font enforcement.")
+
+(defun my-face-should-be-protected-p (face-name)
+  "Return t if FACE-NAME should be protected from font changes."
+  (let ((face-str (symbol-name face-name)))
+    (cl-some (lambda (pattern)
+               (string-match-p pattern face-str))
+             my-protected-face-patterns)))
+
+(defun force-jetbrains-font-selectively ()
+  "Enforce JetBrains Mono font only on text faces, preserving special symbols."
+  ;; Try multiple possible font names for Windows compatibility
+  (let ((jetbrains-fonts '("JetBrainsMono Nerd Font" "JetBrains Mono" "JetBrainsMono-NF"))
+        (font-set nil))
+    ;; Find the first available JetBrains font
+    (dolist (font jetbrains-fonts)
+      (when (member font (font-family-list))
+        (setq font-set font)
+        (return)))
+
+    (when font-set
+      ;; Core text faces
+      (set-face-attribute 'default nil :family font-set :height 110)
+      (set-face-attribute 'fixed-pitch nil :family font-set :height 110)
+      (set-face-attribute 'variable-pitch nil :family font-set :height 110)
+
+      ;; Programming language faces
+      (dolist (face '(font-lock-comment-face font-lock-string-face font-lock-keyword-face
+                      font-lock-function-name-face font-lock-variable-name-face
+                      font-lock-type-face font-lock-constant-face font-lock-builtin-face))
+        (when (facep face)
+          (set-face-attribute face nil :family "JetBrainsMono Nerd Font")))
+
+      (message "JetBrains Mono font applied selectively"))))
+
+;; Apply font enforcement aggressively
+(force-jetbrains-font-selectively)
+
+;; Nuclear font enforcement - run immediately and periodically
+(add-hook 'after-init-hook 'force-jetbrains-font-selectively)
+(add-hook 'window-setup-hook 'force-jetbrains-font-selectively)
+(add-hook 'after-make-frame-functions
+          (lambda (frame) (force-jetbrains-font-selectively)))
+
+;; Force fonts every 3 seconds until they stick
+(run-with-idle-timer 3 t 'force-jetbrains-font-selectively)
+
+;; Manual font fix command
+(defun nuclear-font-fix ()
+  "Aggressively force JetBrains font everywhere while preserving symbol fonts."
+  (interactive)
+  (let ((jetbrains-fonts '("JetBrainsMono Nerd Font" "JetBrains Mono" "JetBrainsMono-NF" "Consolas"))
+        (font-set nil)
+        (faces-changed 0))
+
+    ;; Find available font
+    (dolist (font jetbrains-fonts)
+      (when (member font (font-family-list))
+        (setq font-set font)
+        (return)))
+
+    (when font-set
+      ;; Apply to ALL faces EXCEPT symbol/icon faces
+      (dolist (face (face-list))
+        (let ((face-name (symbol-name face)))
+          (unless (or (string-match-p "all-the-icons" face-name)
+                      (string-match-p "nerd-icons" face-name)
+                      (string-match-p "treemacs-icons" face-name)
+                      (string-match-p "company-icons" face-name)
+                      (string-match-p "emoji" face-name)
+                      (string-match-p "symbol" face-name))
+            (when (facep face)
+              (condition-case err
+                  (progn
+                    (set-face-attribute face nil :family font-set)
+                    (setq faces-changed (1+ faces-changed)))
+                (error nil))))))
+
+      ;; Force default font
+      (set-face-attribute 'default nil :family font-set :height 110)
+
+      ;; Set buffer face mode
+      (setq buffer-face-mode-face `(:family ,font-set :height 110))
+      (buffer-face-mode 1)
+
+      ;; Force frame font
+      (when (fboundp 'set-frame-font)
+        (set-frame-font font-set nil t))
+
+      ;; Redraw
+      (redraw-display)
+
+      (message "NUCLEAR FONT FIX: %s applied to %d faces (preserving symbols)" font-set faces-changed))))
+
+(global-set-key (kbd "C-c M-f") 'nuclear-font-fix)
+
+;; Restore proper programming font everywhere except treemacs icons
+(let ((preferred-font (cond
+                       ((member "JetBrainsMonoNL NFM" (font-family-list)) "JetBrainsMonoNL NFM")
+                       ((member "JetBrainsMono Nerd Font" (font-family-list)) "JetBrainsMono Nerd Font")
+                       ((member "CaskaydiaCove Nerd Font" (font-family-list)) "CaskaydiaCove Nerd Font")
+                       ((member "Cascadia Code" (font-family-list)) "Cascadia Code")
+                       ((member "Consolas" (font-family-list)) "Consolas")
+                       (t nil))))
+  (when preferred-font
+    ;; Core fonts
+    (set-face-attribute 'default nil :family preferred-font :height 110)
+    (set-face-attribute 'fixed-pitch nil :family preferred-font :height 110)
+    (set-face-attribute 'variable-pitch nil :family preferred-font :height 110)
+
+    ;; Programming faces
+    (dolist (face '(font-lock-comment-face font-lock-string-face font-lock-keyword-face
+                    font-lock-function-name-face font-lock-variable-name-face
+                    font-lock-type-face font-lock-constant-face font-lock-builtin-face))
+      (when (facep face)
+        (set-face-attribute face nil :family preferred-font)))
+
+    ;; Mode line
+    (set-face-attribute 'mode-line nil :family preferred-font :height 100)
+    (set-face-attribute 'mode-line-inactive nil :family preferred-font :height 100)
+
+    ;; Minibuffer
+    (set-face-attribute 'minibuffer-prompt nil :family preferred-font)
+
+    ;; Company completion
+    (with-eval-after-load 'company
+      (set-face-attribute 'company-tooltip nil :family preferred-font))
+
+    ;; Compilation faces
+    (dolist (face '(compilation-info compilation-error compilation-warning))
+      (when (facep face)
+        (set-face-attribute face nil :family preferred-font)))
+
+    (message "Font applied: %s (preserving treemacs icons)" preferred-font))
+
+  ;; DO NOT touch these treemacs/icon faces:
+  ;; - treemacs-* faces (file icons)
+  ;; - all-the-icons-* faces
+  ;; - nerd-icons-* faces
+
+  (message "JetBrains font restored everywhere (preserving treemacs icons)"))
+
+;; Comprehensive Unicode setup
+(when (member "JetBrainsMono Nerd Font" (font-family-list))
+  ;; UTF-8 everywhere
+  (set-language-environment "UTF-8")
+  (set-default-coding-systems 'utf-8)
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (prefer-coding-system 'utf-8)
+
+  ;; Font configuration for Unicode
+  (set-fontset-font t 'unicode "JetBrainsMono Nerd Font" nil 'prepend)
+  (set-fontset-font t 'unicode "Segoe UI Symbol" nil 'append)
+  (set-fontset-font t 'unicode "Segoe UI Emoji" nil 'append)
+
+  ;; Critical symbols
+  (set-fontset-font t ?\u2192 "JetBrainsMono Nerd Font" nil 'prepend) ; →
+  (set-fontset-font t ?\u2190 "JetBrainsMono Nerd Font" nil 'prepend) ; ←
+  (set-fontset-font t ?\u2022 "JetBrainsMono Nerd Font" nil 'prepend) ; •
+
+  (message "Unicode font system configured"))
+
+(defun test-font-system-module ()
+  "Test font system module."
+  (interactive)
+  (let ((results '()))
+
+    ;; Test font availability
+    (if (member "JetBrainsMono Nerd Font" (font-family-list))
+        (push "JetBrains font: AVAILABLE" results)
+      (push "JetBrains font: MISSING" results))
+
+    ;; Test function definitions
+    (dolist (func '(force-jetbrains-font-selectively my-face-should-be-protected-p))
+      (if (fboundp func)
+          (push (format "%s: DEFINED" func) results)
+        (push (format "%s: MISSING" func) results)))
+
+    ;; Test current font
+    (let ((current-font (face-attribute 'default :family)))
+      (push (format "Current font: %s" current-font) results))
+
+    ;; Display results
+    (with-current-buffer (get-buffer-create "*Font System Test*")
+      (erase-buffer)
+      (insert "=== Font System Test ===\n\n")
+      (dolist (result (reverse results))
+        (insert (format "%s\n" result)))
+      (display-buffer (current-buffer)))
+
+    (message "Font system test completed")))

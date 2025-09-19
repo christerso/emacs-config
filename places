@@ -1,0 +1,142 @@
+;;; -*- coding: utf-8; mode: lisp-data -*-
+(("c:/Users/chris/AppData/Roaming/.emacs.d/.cache/treemacs-persist"
+  . 77)
+ ("g:/repos/Odin/core/log/log.odin" . 5330)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/init.el" . 1536)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/dashboard.org" . 9763)
+ ("g:/repos/nan/src/editor/editor.odin" . 1018)
+ ("g:/repos/nan/src/editor/"
+  (dired-filename . "g:/repos/nan/src/editor/editor.odin"))
+ ("g:/repos/nan/src/core/core.odin" . 853)
+ ("g:/repos/nan/src/core/"
+  (dired-filename . "g:/repos/nan/src/core/.."))
+ ("g:/repos/" (dired-filename . "g:/repos/neontech"))
+ ("g:/repos/neontech/" (dired-filename . "g:/repos/neontech/main.cpp"))
+ ("g:/repos/neontech/main.cpp" . 44)
+ ("g:/repos/nan/src/math/math.odin" . 13)
+ ("g:/repos/nan/src/math/"
+  (dired-filename . "g:/repos/nan/src/math/.."))
+ ("g:/repos/nan/src/" (dired-filename . "g:/repos/nan/src/world"))
+ ("g:/repos/nan/src/world/"
+  (dired-filename . "g:/repos/nan/src/world/world.odin"))
+ ("g:/repos/nan/src/world/world.odin" . 1398)
+ ("g:/repos/nan/" (dired-filename . "g:/repos/nan/.."))
+ ("g:/repos/dream/"
+  (dired-filename . "g:/repos/dream/cmake-build-debug"))
+ ("g:/repos/dream/CMakeLists.txt" . 2441)
+ ("g:/repos/dream/main.c" . 7554)
+ ("g:/repos/dream/src/game/game_main.c" . 37764)
+ ("g:/repos/dream/src/game/game_main.h" . 162)
+ ("g:/repos/dream/src/game/" . 946)
+ ("g:/repos/dream/src/game/entity_api.h" . 1902)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/modules/language-support.org"
+  . 4768)
+ ("g:/repos/Odin/core/fmt/fmt.odin" . 7034)
+ ("g:/repos/Odin/base/runtime/core.odin" . 9599)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/modules/odin-unicode.org"
+  . 3351)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/modules/workspace-management.org"
+  . 5434)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/modules/file-management.org"
+  . 2525)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/modules/window-navigation.org"
+  . 2656)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/modules/font-system.org"
+  . 5163)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/modules/core-packages.org"
+  . 2245)
+ ("g:/repos/nan/docs/prd.md" . 1095)
+ ("g:/repos/Odin/vendor/sdl3/sdl3_render.odin" . 1027)
+ ("g:/repos/nan/docs/design/ascii-mapping.md" . 9256)
+ ("g:/repos/nan/docs/algorithms/grid-system.md" . 9199)
+ ("g:/repos/arc/ARC.md" . 3761) ("g:/repos/arc/" . 2892)
+ ("g:/repos/nan/src/renderer/renderer.odin" . 148)
+ ("g:/repos/arc/CODING_STANDARDS.md" . 267)
+ ("g:/repos/arc/Makefile" . 7850)
+ ("g:/repos/nan/src/main.odin" . 2353)
+ ("g:/repos/Odin/base/runtime/"
+  (dired-filename
+   . "g:/repos/Odin/base/runtime/default_allocators_general.odin"))
+ ("g:/repos/nan/docs/rendering/ascii-renderer.md" . 3046)
+ ("g:/repos/dream/3rdparty/SDL3/include/SDL3/SDL_timer.h" . 5713)
+ ("g:/repos/dream/docs/data-structures/binary-trees/01-fundamentals.md"
+  . 1829)
+ ("g:/repos/dream/docs/data-structures/binary-trees/"
+  (dired-filename . "g:/repos/dream/docs/data-structures"))
+ ("g:/repos/dream/docs/data-structures/"
+  (dired-filename . "g:/repos/dream/docs"))
+ ("g:/repos/dream/docs/" (dired-filename . "g:/repos/dream"))
+ ("g:/repos/infi/src/" (dired-filename . "g:/repos/infi"))
+ ("g:/repos/infi/" (dired-filename . "g:/repos"))
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/"
+  (dired-filename
+   . "c:/Users/chris/AppData/Roaming/.emacs.d/.gitignore"))
+ ("g:/" (dired-filename . "g:/repos"))
+ ("g:/repos/autonomica/" (dired-filename . "g:/repos/autonomica/src"))
+ ("g:/repos/autonomica/src/"
+  (dired-filename . "g:/repos/autonomica/src/gpu_stress_test.cpp"))
+ ("g:/repos/autonomica/src/gpu_stress_test.cpp" . 503)
+ ("g:/repos/dream/src/allocation_tracker.c" . 61)
+ ("g:/repos/dream/src/interior.h" . 54)
+ ("g:/repos/dream/src/" (dired-filename . "g:/repos/dream"))
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/.treemacs-persist" . 42)
+ ("g:/repos/gaze/src/final_vulkan_game.odin" . 14047)
+ ("g:/repos/dream/src/math/"
+  (dired-filename . "g:/repos/dream/src/math/math.h"))
+ ("g:/repos/gaze/src/"
+  (dired-filename . "g:/repos/gaze/src/final_vulkan_game.odin"))
+ ("g:/repos/Odin/base/runtime/default_allocators_general.odin" . 540)
+ ("c:/Users/chris/AppData/Roaming/.emacs.d/elpa/markdown-mode-20250812.423/markdown-mode.el"
+  . 84325)
+ ("c:/Program Files/Emacs/emacs-30.2/bin/"
+  (dired-filename . "c:/Program Files/Emacs/emacs-30.2/bin"))
+ ("g:/repos/gaze/" (dired-filename . "g:/repos/gaze/src"))
+ ("g:/repos/cyber/" (dired-filename . "g:/repos"))
+ ("g:/repos/crush/" (dired-filename . "g:/repos"))
+ ("g:/repos/Code/" (dired-filename . "g:/repos"))
+ ("g:/repos/cro/" (dired-filename . "g:/repos"))
+ ("g:/repos/sim/" (dired-filename . "g:/repos"))
+ ("g:/repos/sim/src/" (dired-filename . "g:/repos/sim"))
+ ("g:/repos/crom/" (dired-filename . "g:/repos"))
+ ("g:/repos/autonomica/docs/"
+  (dired-filename . "g:/repos/autonomica/docs/systems"))
+ ("g:/repos/breach/docs/" (dired-filename . "g:/repos/breach"))
+ ("g:/repos/dream/3rdparty/"
+  (dired-filename . "g:/repos/dream/3rdparty/stb"))
+ ("g:/repos/dream/docs/C11/" . 129)
+ ("g:/repos/arc/scripts/"
+  (dired-filename . "g:/repos/arc/scripts/generate_item_batch.go"))
+ ("g:/repos/dream/3rdparty/SDL3/include/SDL3/SDL_video.h" . 46647)
+ ("g:/repos/arc/internal/ballistics/"
+  (dired-filename . "g:/repos/arc/internal/ballistics/ballistics.go"))
+ ("g:/repos/arc/internal/ballistics/ballistics.go" . 1532)
+ ("g:/repos/arc/internal/culture/"
+  (dired-filename . "g:/repos/arc/internal/culture/framework.go"))
+ ("g:/repos/arc/internal/culture/types.go" . 3410)
+ ("g:/repos/arc/internal/culture/framework.go" . 3358)
+ ("g:/repos/arc/scripts/generate_item_batch.go" . 53)
+ ("g:/repos/arc/scripts/check-implementation.go" . 189)
+ ("c:/Program Files/Go/src/os/path.go" . 528)
+ ("c:/Users/chris/go/pkg/mod/github.com/hajimehoshi/ebiten/v2@v2.8.8/window.go"
+  . 2774)
+ ("g:/repos/arc/cmd/main.go" . 685)
+ ("g:/repos/arc/internal/entities/components.go" . 659)
+ ("g:/repos/arc/internal/entities/item_component.go" . 113)
+ ("g:/repos/dream/docs/logger.md" . 1267)
+ ("g:/repos/dream/src/physics/physics.h" . 891)
+ ("g:/repos/dream/src/physics/"
+  (dired-filename . "g:/repos/dream/src"))
+ ("g:/repos/dream/docs/Mythos/"
+  (dired-filename . "g:/repos/dream/docs"))
+ ("g:/repos/dream/src/physics/physics_simd.h" . 15773)
+ ("g:/repos/dream/docs/ideas.md" . 162)
+ ("g:/repos/dream/src/allocation_tracker.h" . 283)
+ ("g:/repos/breach/" (dired-filename . "g:/repos/breach/docs"))
+ ("c:/Program Files/Emacs/emacs-30.2/"
+  (dired-filename . "c:/Program Files/Emacs"))
+ ("c:/Program Files/Emacs/" (dired-filename . "c:/Program Files"))
+ ("c:/Program Files/" (dired-filename . "c:/"))
+ ("c:/" (dired-filename . "c:/Documents and Settings"))
+ ("g:/repos/arc/internal/"
+  (dired-filename . "g:/repos/arc/internal/culture"))
+ ("g:/repos/dream/3rdparty/SDL3/include/SDL3/SDL_begin_code.h" . 13122))

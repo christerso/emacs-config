@@ -1,0 +1,225 @@
+;; Projectile for project management
+(unless (package-installed-p 'projectile)
+  (package-install 'projectile))
+
+(require 'projectile)
+(projectile-mode +1)
+
+;; Vertico ecosystem - modern completion
+(unless (package-installed-p 'vertico)
+  (package-install 'vertico))
+
+(unless (package-installed-p 'consult)
+  (package-install 'consult))
+
+(unless (package-installed-p 'marginalia)
+  (package-install 'marginalia))
+
+(unless (package-installed-p 'orderless)
+  (package-install 'orderless))
+
+;; Install a.el for advanced header/implementation switching
+(unless (package-installed-p 'a)
+  (package-install 'a))
+
+;; Load and configure
+(require 'vertico)
+(require 'consult)
+(require 'marginalia)
+(require 'orderless)
+
+(vertico-mode 1)
+(marginalia-mode 1)
+
+(setq completion-styles '(orderless basic)
+      completion-category-defaults nil
+      completion-category-overrides '((file (styles partial-completion))))
+
+;; Enhanced keybindings - only if functions exist
+(when (fboundp 'consult-M-x)
+  (global-set-key (kbd "M-x") 'consult-M-x))
+
+(when (fboundp 'consult-buffer)
+  (global-set-key (kbd "C-x b") 'consult-buffer))
+
+(when (fboundp 'consult-recent-file)
+  (global-set-key (kbd "C-x C-r") 'consult-recent-file))
+
+(when (fboundp 'consult-line)
+  (global-set-key (kbd "C-s") 'consult-line))
+
+;; Fallback keybindings if consult isn't available
+(unless (fboundp 'consult-recent-file)
+  (global-set-key (kbd "C-x C-r") 'recentf-open-files))
+
+(unless (fboundp 'consult-buffer)
+  (global-set-key (kbd "C-x b") 'switch-to-buffer))
+
+;; Dark company completion menu
+(with-eval-after-load 'company
+  (set-face-background 'company-tooltip "#1e1e1e")
+  (set-face-foreground 'company-tooltip "#d4d4d4")
+  (set-face-background 'company-tooltip-selection "#264f78")
+  (set-face-foreground 'company-tooltip-selection "#ffffff"))
+
+;; Install and configure ripgrep package for proper interactive search
+(unless (package-installed-p 'rg)
+  (package-install 'rg))
+
+(require 'rg)
+
+;; Configure rg package
+(setq rg-executable "rg")
+(setq rg-group-result t)
+(setq rg-hide-command t)
+(setq rg-show-columns nil)
+(setq rg-align-position-numbers t)
+(setq rg-align-line-number-field-length 3)
+(setq rg-align-column-number-field-length 3)
+
+;; Project-aware ripgrep function using the rg package
+(defun my-ripgrep-project (pattern)
+  "Search in project using rg package - interactive results with jump capability."
+  (interactive (list (read-string "Ripgrep project search: ")))
+  (let ((project-root (or (and (fboundp 'projectile-project-root)
+                               (projectile-project-root))
+                          ;; Fallback: look for common project markers
+                          (locate-dominating-file default-directory ".git")
+                          (locate-dominating-file default-directory "go.mod")
+                          (locate-dominating-file default-directory "CMakeLists.txt")
+                          (locate-dominating-file default-directory "Cargo.toml")
+                          (locate-dominating-file default-directory "package.json")
+                          default-directory)))
+    (let ((default-directory project-root))
+      (rg pattern "*" project-root))
+    ;; Focus the rg results window
+    (run-with-timer 0.1 nil
+                    (lambda ()
+                      (let ((rg-window (get-buffer-window "*rg*")))
+                        (when rg-window
+                          (select-window rg-window)
+                          (goto-char (point-min))
+                          ;; Move to first result
+                          (when (re-search-forward "^[0-9]+:" nil t)
+                            (beginning-of-line))))))))
+
+;; Current directory ripgrep function
+(defun my-ripgrep-current-dir (pattern)
+  "Search in current directory using rg package - interactive results."
+  (interactive (list (read-string "Ripgrep current dir search: ")))
+  (rg pattern "*" default-directory)
+  ;; Focus the rg results window
+  (run-with-timer 0.1 nil
+                  (lambda ()
+                    (let ((rg-window (get-buffer-window "*rg*")))
+                      (when rg-window
+                        (select-window rg-window)
+                        (goto-char (point-min))
+                        ;; Move to first result
+                        (when (re-search-forward "^[0-9]+:" nil t)
+                          (beginning-of-line)))))))
+
+;; Ripgrep keybindings - now using proper rg package
+(global-set-key (kbd "C-c r") 'my-ripgrep-project)           ; C-c r = ripgrep project with jump capability
+(global-set-key (kbd "C-c R") 'my-ripgrep-current-dir)      ; C-c R = ripgrep current directory
+(global-set-key (kbd "C-c g") 'rg-menu)                     ; C-c g = ripgrep menu for advanced options
+
+;; Debug: Show what's actually bound
+(message "C-x C-r bound to: %s" (key-binding (kbd "C-x C-r")))
+(message "C-x b bound to: %s" (key-binding (kbd "C-x b")))
+
+;; Company for completions (must be before eglot)
+(unless (package-installed-p 'company)
+  (package-install 'company))
+
+(require 'company)
+(global-company-mode 1)
+(setq company-idle-delay 0.1)
+(setq company-minimum-prefix-length 1)
+
+;; Eglot for LSP
+(require 'eglot)
+(add-to-list 'eglot-server-programs '(c-mode . ("clangd")))
+(add-hook 'c-mode-hook 'eglot-ensure)
+
+(defun test-core-packages-module ()
+  "Test core packages module functionality."
+  (interactive)
+  (let ((results '()))
+
+    ;; Test package availability
+    (dolist (pkg '(projectile vertico consult marginalia orderless))
+      (if (featurep pkg)
+          (push (format "%s: LOADED" pkg) results)
+        (push (format "%s: NOT LOADED" pkg) results)))
+
+    ;; Test key bindings
+    (dolist (key '("M-x" "C-x b" "C-s"))
+      (let ((binding (key-binding (kbd key))))
+        (push (format "%s -> %s" key binding) results)))
+
+    ;; Display results
+    (with-current-buffer (get-buffer-create "*Core Packages Test*")
+      (erase-buffer)
+      (insert "=== Core Packages Module Test ===\n\n")
+      (dolist (result (reverse results))
+        (insert (format "%s\n" result)))
+      (display-buffer (current-buffer)))
+
+    (message "Core packages test completed")))
+
+;; C/C++ Header/Implementation Toggle
+;; Configure both projectile and a.el for header switching
+
+;; Load a.el for advanced header/implementation switching
+(require 'a)
+
+;; Configure ff-find-other-file (built-in) for C/C++
+(setq ff-other-file-alist
+      '(("\\.cc\\'" (".hh" ".h"))
+        ("\\.hh\\'" (".cc" ".C" ".cpp"))
+        ("\\.c\\'" (".h"))
+        ("\\.h\\'" (".c" ".cc" ".C" ".cpp"))
+        ("\\.C\\'" (".H" ".hh" ".h"))
+        ("\\.H\\'" (".C" ".CC"))
+        ("\\.cpp\\'" (".hpp" ".hh" ".h"))
+        ("\\.hpp\\'" (".cpp" ".c"))
+        ("\\.cxx\\'" (".hxx" ".hh" ".h"))
+        ("\\.hxx\\'" (".cxx"))))
+
+;; Configure search paths
+(setq ff-search-directories
+      '("." "../src" "../include" "../inc" "../../src" "../../include"
+        "../../../src" "../../../include"))
+
+;; Smart toggle function that tries multiple methods
+(defun toggle-c-header-implementation ()
+  "Toggle between C/C++ header and implementation files using multiple methods."
+  (interactive)
+  (let ((current-file (buffer-file-name)))
+    (when current-file
+      (cond
+       ;; Try projectile first (if available and in project)
+       ((and (fboundp 'projectile-project-root)
+             (projectile-project-root)
+             (fboundp 'projectile-find-other-file))
+        (condition-case nil
+            (projectile-find-other-file)
+          (error
+           (message "Projectile couldn't find other file, trying ff-find-other-file...")
+           (ff-find-other-file))))
+
+       ;; Try a.el
+       ((fboundp 'a-find-other-file)
+        (condition-case nil
+            (a-find-other-file)
+          (error
+           (message "a.el couldn't find other file, trying ff-find-other-file...")
+           (ff-find-other-file))))
+
+       ;; Fallback to built-in ff-find-other-file
+       (t
+        (ff-find-other-file))))))
+
+;; Bind to C-x z
+(global-set-key (kbd "C-x z") 'toggle-c-header-implementation)

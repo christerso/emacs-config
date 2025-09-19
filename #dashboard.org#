@@ -1,0 +1,253 @@
+o#+TITLE: 🚀 Emacs Development Dashboard
+#+AUTHOR: Chris
+#+STARTUP: overview
+#+OPTIONS: toc:nil num:nil timestamp:nil
+#+HTML_HEAD: <style>body{font-family:'JetBrains Mono',monospace;}</style>
+
+* 🎯 Quick Actions
+
+** 📁 Project Management
+*** Load Recent Projects
+- [[elisp:(consult-projectile-switch-project)][🔄 Switch to Project (Telescope-style)]]
+- [[elisp:(my-create-project-workspace (read-directory-name "Project: "))][➕ Create New Project Workspace]]
+- [[elisp:(my-list-project-workspaces)][📋 List All Active Workspaces]]
+- [[elisp:(projectile-discover-projects-in-directory "G:/repos/")][🔍 Discover Projects in G:/repos/]]
+
+*** Current Workspace
+- [[elisp:(my-switch-project-workspace)][🔀 Switch Active Workspace]]
+- [[elisp:(my-close-project-workspace)][❌ Close Current Workspace]]
+
+** 🛠️ Development Tools
+*** File & Code Navigation
+- [[elisp:(consult-projectile-find-file)][📄 Find File in Project (Fuzzy)]]
+- [[elisp:(telescope-everything)][🔍 Everything Search (System-wide)]]
+- [[elisp:(consult-recent-file)][⏰ Recent Files]]
+- [[elisp:(ripgrep-search)][🔎 Search Code (Ripgrep)]]
+- [[elisp:(treemacs)][🌳 Toggle File Tree (Treemacs)]]
+
+*** Build & Run
+- [[elisp:(smart-build)][🔨 Smart Build (F3)]]
+- [[elisp:(smart-run)][▶️ Smart Run (F4)]]
+- [[elisp:(smart-debug)][🐛 Smart Debug (Shift+F4)]]
+
+** ⚙️ System & Config
+- [[elisp:(find-file "C:/Users/chris/AppData/Roaming/.emacs.d/config.org")][⚙️ Edit Emacs Config]]
+- [[elisp:(find-file "C:/Users/chris/AppData/Roaming/.emacs.d/dashboard.org")][📝 Edit This Dashboard]]
+- [[elisp:(force-jetbrains-font-selectively)][🎨 Fix Fonts]]
+- [[elisp:(restart-emacs)][🔄 Restart Emacs]] (if restart-emacs is installed)
+
+* 📚 Documentation & Help
+
+** 🎹 Keybinding References
+*** Core Navigation
+| Key            | Action                           |
+|----------------+----------------------------------|
+| =C-c w c=      | Create project workspace         |
+| =C-c w s=      | Switch workspace                 |
+| =C-c w w=      | Quick workspace switcher         |
+| =C-c w l=      | List all workspaces              |
+| =C-c w k=      | Close workspace                  |
+
+*** File & Search Operations
+| Key            | Action                           |
+|----------------+----------------------------------|
+| =C-c s=        | Everything search (system-wide)  |
+| =C-c e=        | Everything search in project     |
+| =C-c r=        | Ripgrep text search              |
+| =C-c p f=      | Find file in project             |
+| =C-c p p=      | Switch project                   |
+| =C-c p s g=    | Search text in project           |
+
+*** Build & Development
+| Key            | Action                           |
+|----------------+----------------------------------|
+| =F3=           | Smart build (detects type)      |
+| =F4=           | Smart run (detects type)        |
+| =Shift+F4=     | Smart debug (detects type)      |
+| =F5=           | Dream-specific build             |
+| =F6=           | Dream-specific run               |
+| =Shift+F6=     | Dream-specific debug             |
+
+*** Window & Buffer Management
+| Key              | Action                         |
+|------------------+--------------------------------|
+| =C-M-<arrows>=   | Move between windows           |
+| =S-<arrows>=     | Move between windows (alt)     |
+| =C-S-<arrows>=   | Resize windows                 |
+| =C-<tab>=        | Next buffer                    |
+| =C-S-<tab>=      | Previous buffer                |
+| =C-x k=          | Kill buffer (no questions)    |
+
+*** Code Editing
+| Key            | Action                           |
+|----------------+----------------------------------|
+| =C-/=          | Smart comment/uncomment          |
+| =C-c f=        | Format buffer (mode-specific)    |
+| =C-c F=        | Format and save                  |
+| =C->=          | Multiple cursors: next           |
+| =C-<=          | Multiple cursors: previous       |
+| =C-c C-<=      | Multiple cursors: all like this  |
+
+*** Custom Features
+| Key            | Action                           |
+|----------------+----------------------------------|
+| =C-c C-f=      | Customize font at point          |
+| =C-<backspace>= | Copy entire buffer              |
+| =C-x C-c=      | Exit Emacs (no questions)       |
+
+** 📖 Markdown Commands
+| Key            | Action                           |
+|----------------+----------------------------------|
+| =C-c m p=      | Toggle markdown preview          |
+| =C-c m g=      | GitHub-style preview             |
+| =C-c m s=      | Split window preview             |
+| =C-c m v=      | Original preview mode            |
+
+** 🌳 Treemacs Commands
+| Key            | Action                           |
+|----------------+----------------------------------|
+| =M-0=          | Focus treemacs                   |
+| =C-x t t=      | Toggle treemacs                  |
+| =C-x t C-t=    | Find current file in tree        |
+| =C-x t d=      | Select directory                 |
+
+* 🎨 Customizations & Features
+
+** 🔧 Major Enhancements Added
+*** Multi-Project Workspace System
+- ✅ **Isolated project workspaces** with perspective.el
+- ✅ **Color-coded project indicators** in mode line
+- ✅ **Auto-detection** of project context when opening files
+- ✅ **Visual project switching** with fuzzy search
+
+*** Advanced File Navigation
+- ✅ **Everything integration** for lightning-fast file search
+- ✅ **Telescope-like interface** with Vertico + Consult
+- ✅ **Fuzzy project file finding** with preview
+- ✅ **Ripgrep integration** for code search
+
+*** Smart Build System
+- ✅ **Auto-detection** of project types (CMake, Go, Odin, C)
+- ✅ **Intelligent build commands** based on project structure
+- ✅ **RemedyBG integration** for C/C++ debugging
+- ✅ **Compilation window auto-management**
+
+*** Font & Display System
+- ✅ **JetBrains Mono Nerd Font** enforcement everywhere
+- ✅ **Comprehensive Unicode support** with proper fallbacks
+- ✅ **Icon preservation** for file browsers and trees
+- ✅ **Perfect emoji and symbol rendering**
+
+*** User Experience
+- ✅ **No confirmation prompts** on exit or buffer killing
+- ✅ **Persistent scratch buffer** with org-mode
+- ✅ **Smart commenting** with context awareness
+- ✅ **Window navigation** with arrow keys
+- ✅ **Multiple cursors** for efficient editing
+
+** 🔌 Key Packages Installed
+*** Navigation & Interface
+- =perspective.el= - Project workspaces
+- =projectile= - Project management
+- =vertico= - Completion interface
+- =consult= - Search and navigation
+- =treemacs= - File tree browser
+- =which-key= - Keybinding discovery
+
+*** Development Tools
+- =eglot= - LSP client (C, Go, Odin)
+- =company= - Auto-completion
+- =multiple-cursors= - Multi-cursor editing
+- =rainbow-delimiters= - Bracket colorization
+- =markdown-mode= - Markdown editing with preview
+
+*** File Management
+- =dired-sidebar= - Enhanced file browser
+- =all-the-icons-dired= - File type icons
+- =consult-projectile= - Project file navigation
+
+** 📜 Custom Scripts & Functions
+*** Project Management
+- =my-create-project-workspace= - Smart workspace creation
+- =my-switch-project-workspace= - Visual workspace switching
+- =my-auto-detect-project= - Context-aware project switching
+- =my-assign-project-color= - Visual project identification
+
+*** Build & Development
+- =smart-build= - Auto-detecting build system
+- =smart-run= - Auto-detecting run system
+- =smart-debug= - Auto-detecting debug system
+- =format-buffer= - Language-aware code formatting
+
+*** Font & Display
+- =force-jetbrains-font-selectively= - Intelligent font enforcement
+- =customize-font-at-point= - Interactive font customization
+- =my-ensure-consistent-font= - Font consistency management
+
+*** Navigation & Search
+- =telescope-everything= - Everything search interface
+- =ripgrep-search= - Code search with ripgrep
+- =my-comment-dwim= - Smart commenting system
+
+*** Utility Functions
+- =my-force-kill-emacs= - Exit without prompts
+- =copy-entire-buffer= - Quick buffer copying
+- =my-markdown-split-preview= - Enhanced markdown preview
+
+* 🏗️ Quick Project Templates
+
+** 🆕 Start New Project
+*** C/C++ Project
+#+BEGIN_SRC bash
+# Create new C project with CMake
+mkdir ~/new-c-project
+cd ~/new-c-project
+echo "cmake_minimum_required(VERSION 3.10)" > CMakeLists.txt
+echo "project(MyProject)" >> CMakeLists.txt
+mkdir src
+echo '#include <stdio.h>\nint main() { printf("Hello World!\\n"); return 0; }' > src/main.c
+#+END_SRC
+
+*** Go Project
+#+BEGIN_SRC bash
+# Create new Go module
+mkdir ~/new-go-project
+cd ~/new-go-project
+go mod init myproject
+echo 'package main\nimport "fmt"\nfunc main() { fmt.Println("Hello Go!") }' > main.go
+#+END_SRC
+
+*** Odin Project
+#+BEGIN_SRC bash
+# Create new Odin project
+mkdir ~/new-odin-project
+cd ~/new-odin-project
+echo 'package main\nimport "core:fmt"\nmain :: proc() { fmt.println("Hello Odin!") }' > main.odin
+#+END_SRC
+
+** 🔗 Quick Links
+- [[file:G:/repos/dream/][🎮 Dream Project]]
+- [[file:C:/Users/chris/go/][🐹 Go Projects]]
+- [[file:G:/repos/][📁 All Repositories]]
+- [[file:C:/Users/chris/AppData/Roaming/.emacs.d/][⚙️ Emacs Configuration]]
+
+* 📊 System Status
+
+** 📈 Performance Tips
+- Use =C-c s= for fastest file search (Everything integration)
+- Use =F3-F4= workflow for quick build-test cycles
+- Use =C-c w= prefix for all workspace operations
+- Use =C-/= for smart commenting in any language
+- Use multiple cursors (=C->=) for bulk editing
+
+** 🔧 Troubleshooting
+- Font issues? Run: =M-x force-jetbrains-font-selectively=
+- LSP not working? Check clangd/gopls/ols installation
+- Project not detected? Use =C-c w c= to create workspace manually
+- Unicode issues? Restart Emacs to reload font configuration
+
+---
+💡 **Tip**: This dashboard is fully interactive! Click any blue link to execute the action.
+🎨 **Customize**: Edit this file at =C:/Users/chris/AppData/Roaming/.emacs.d/dashboard.org=
+
+⚡ **Happy Coding!** ⚡
