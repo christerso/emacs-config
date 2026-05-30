@@ -43,8 +43,12 @@
 (global-set-key (kbd "C-c f e") #'consult-flymake)       ;; diagnostics
 (global-set-key (kbd "C-c f G") #'consult-git-grep)      ;; grep tracked files
 
-;; Make the everyday buffer switch and yank-pop use consult's previewed UI too.
-(global-set-key (kbd "C-x b") #'consult-buffer)
+;; Make the everyday buffer commands use consult's fuzzy, previewed menu.
+;; Both C-x b and C-x C-b now open the fancy fuzzy-find buffer list; the plain
+;; ibuffer manager is still one key away on C-c f B.
+(global-set-key (kbd "C-x b")   #'consult-buffer)
+(global-set-key (kbd "C-x C-b") #'consult-buffer)
+(global-set-key (kbd "C-c f B") #'ibuffer)
 (with-eval-after-load 'consult
   (global-set-key (kbd "M-y") #'consult-yank-pop))
 

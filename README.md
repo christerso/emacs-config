@@ -13,6 +13,7 @@ init.el            Minimal bootstrap: package archives, loads config.org, then l
 config.org         Literate core: defaults, completion stack, eglot, Go, C/C++, Org
 lisp/
   quick-search.el  Telescope-style fuzzy "search everything" (C-c f …)
+  run-console.el   C-c m r: run the program in a persistent external console
   lang-odin.el     Odin   — odin-mode + ols
   lang-zig.el      Zig    — zig-mode + zls
   lang-sql.el      SQL    — sql-mode + sql-indent (+ optional sqls)
@@ -51,6 +52,12 @@ Minibuffer icons via [nerd-icons-completion](https://github.com/rainstormstudio/
 `C-c c` compile · `C-c C-c` recompile · `C-c r` run-this-file/package.
 Go adds `C-c t <k>` tests; C/C++ adds `C-c o` source↔header; Zig adds `C-c t` test;
 SQL uses `C-c C-f` to format.
+
+`C-c m r` runs the project's program in a **real external terminal that stays
+open** after exit (prints the exit code, waits for Enter — so crashes are
+readable). The run command is guessed from the project and editable. Terminal
+auto-detects (ghostty/kitty/alacritty/konsole/…); override with
+`(setq cs/console-terminal "konsole")`.
 
 ## Requirements
 

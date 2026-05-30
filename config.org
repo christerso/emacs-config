@@ -556,7 +556,8 @@ and =writeroom= / =flyspell-mode= retain their original toggles.
 ;; Existing toggles
 (global-set-key (kbd "C-c w") #'writeroom-mode)        ;; was bound in old config
 (global-set-key (kbd "C-c s") #'flyspell-mode)         ;; was bound in old config
-(global-set-key (kbd "C-x C-b") #'ibuffer)             ;; was bound in old config
+;; C-x C-b now opens the fuzzy consult-buffer menu (see lisp/quick-search.el);
+;; ibuffer moved to C-c f B there.
 
 ;; New, non-conflicting additions
 (global-set-key (kbd "C-x g")   #'magit-status)        ;; community standard
