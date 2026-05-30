@@ -149,7 +149,12 @@ Custom theme dir is added so the local =voidlight-theme.el= is picked up.
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
 (menu-bar-mode -1)
-(set-face-attribute 'default nil :family "monospace" :height 120)
+
+;; JetBrains Mono Nerd Font (NL = no-ligatures, NFM = Nerd Font Mono variant).
+;; Installed via `ttf-jetbrains-mono-nerd'. `fixed-pitch' is matched too so org
+;; code blocks and tables share the same glyphs (and the nerd-font icons).
+(set-face-attribute 'default nil     :family "JetBrainsMonoNL NFM" :height 120)
+(set-face-attribute 'fixed-pitch nil :family "JetBrainsMonoNL NFM" :height 120)
 
 (setq scroll-step 1
       scroll-margin 3
