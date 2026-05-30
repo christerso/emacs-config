@@ -1,0 +1,576 @@
+#+TITLE: Christer's Emacs Configuration
+#+AUTHOR: Christer Söderlund
+#+PROPERTY: header-args:emacs-lisp :tangle yes :results none
+
+* Bootstrap & performance
+
+Garbage collection is tuned high during startup, then relaxed. The file-name
+handler is muted while loading to skip remote-file checks.
+
+#+begin_src emacs-lisp
+(setq gc-cons-threshold (* 64 1024 1024)
+      gc-cons-percentage 0.5)
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold (* 16 1024 1024)
+                  gc-cons-percentage 0.1)))
+
+(setq read-process-output-max (* 4 1024 1024))   ;; 4 MiB — gopls is chatty
+(setq use-package-always-ensure t
+      use-package-expand-minimally t)
+#+end_src
+
+* Sane defaults
+
+#+begin_src emacs-lisp
+(setq inhibit-startup-screen t
+      initial-scratch-message nil
+      ring-bell-function 'ignore
+      use-short-answers t                       ;; y/n instead of yes/no
+      create-lockfiles nil
+      require-final-newline t
+      sentence-end-double-space nil
+      vc-follow-symlinks t
+      load-prefer-newer t
+      large-file-warning-threshold (* 100 1024 1024))
+
+(setq-default indent-tabs-mode nil
+              tab-width 4
+              fill-column 100)
+
+(global-auto-revert-mode 1)
+(setq global-auto-revert-non-file-buffers t
+      auto-revert-verbose nil)
+
+(delete-selection-mode 1)
+(electric-pair-mode 1)
+(show-paren-mode 1)
+(setq show-paren-delay 0)
+(global-so-long-mode 1)
+(repeat-mode 1)
+
+(add-hook 'prog-mode-hook #'display-line-numbers-mode)
+(add-hook 'prog-mode-hook #'hl-line-mode)
+
+;; Never nag for a TAGS table. Drop the etags xref backend so that when no
+;; smart backend (eglot, elisp) is active, M-. simply reports "No definitions
+;; found" instead of prompting to visit a tags file. LSP and Emacs-Lisp
+;; navigation are unaffected — they register their own backends.
+(with-eval-after-load 'etags
+  (remove-hook 'xref-backend-functions #'etags--xref-backend))
+#+end_src
+
+* Backups, autosave, and history
+
+#+begin_src emacs-lisp
+(setq backup-directory-alist '(("." . "~/.emacs.d/backups"))
+      auto-save-file-name-transforms '((".*" "~/.emacs.d/auto-save-list/" t))
+      backup-by-copying t
+      delete-old-versions t
+      kept-new-versions 6
+      kept-old-versions 2
+      version-control t)
+#+end_src
+
+* Session persistence — remember where I was
+
+=saveplace= restores point in every visited file. =savehist= preserves the
+minibuffer history (and kill ring). =recentf= keeps recently opened files
+quickly reachable. =desktop-save-mode= reopens the buffer list (not frames —
+that gets flaky with eglot).
+
+#+begin_src emacs-lisp
+(use-package saveplace
+  :ensure nil
+  :init (save-place-mode 1))
+
+(use-package savehist
+  :ensure nil
+  :init
+  (setq savehist-additional-variables
+        '(kill-ring search-ring regexp-search-ring command-history))
+  (savehist-mode 1))
+
+(use-package recentf
+  :ensure nil
+  :init
+  (setq recentf-max-saved-items 200
+        recentf-max-menu-items 25
+        recentf-auto-cleanup 'never)
+  (recentf-mode 1))
+
+(use-package desktop
+  :ensure nil
+  :init
+  (setq desktop-save t
+        desktop-restore-eager 5
+        desktop-restore-frames nil
+        desktop-load-locked-desktop t
+        desktop-auto-save-timeout 60
+        desktop-files-not-to-save
+        "\\(^/[^/:]*:\\|(ftp)$\\|\\.gpg$\\|COMMIT_EDITMSG\\|MERGE_MSG\\)")
+  :config (desktop-save-mode 1))
+#+end_src
+
+* Environment
+
+=exec-path-from-shell= copies PATH/GOPATH/etc. from the login shell so
+=gopls=, =dlv=, =gofumpt= are findable when launching Emacs from a desktop.
+=envrc= activates =direnv= environments per-buffer.
+
+#+begin_src emacs-lisp
+(use-package exec-path-from-shell
+  :init
+  (setq exec-path-from-shell-arguments '("-l"))   ;; login shell only — fast
+  :config
+  (dolist (v '("PATH" "MANPATH" "GOPATH" "GOROOT" "GOBIN"
+               "GOPROXY" "GOFLAGS" "CGO_ENABLED" "GO111MODULE"))
+    (add-to-list 'exec-path-from-shell-variables v))
+  (when (memq window-system '(mac ns x pgtk))
+    (exec-path-from-shell-initialize))
+  (unless (window-system) (exec-path-from-shell-initialize))
+  ;; Make sure ~/go/bin is on PATH/exec-path even if the shell missed it
+  (let ((gobin (expand-file-name "~/go/bin")))
+    (add-to-list 'exec-path gobin)
+    (setenv "PATH" (concat gobin ":" (getenv "PATH")))))
+
+(use-package envrc
+  :hook (after-init . envrc-global-mode))
+#+end_src
+
+* Appearance — voidlight theme, modeline, icons
+
+Custom theme dir is added so the local =voidlight-theme.el= is picked up.
+
+#+begin_src emacs-lisp
+(add-to-list 'custom-theme-load-path (expand-file-name "themes" user-emacs-directory))
+(load-theme 'voidlight t)
+
+(tool-bar-mode -1)
+(scroll-bar-mode -1)
+(menu-bar-mode -1)
+(set-face-attribute 'default nil :family "monospace" :height 120)
+
+(setq scroll-step 1
+      scroll-margin 3
+      scroll-conservatively 10000
+      mouse-wheel-progressive-speed nil)
+
+(use-package nerd-icons)              ;; run M-x nerd-icons-install-fonts once
+
+(use-package doom-modeline
+  :init (doom-modeline-mode 1)
+  :custom
+  (doom-modeline-height 28)
+  (doom-modeline-buffer-encoding nil)
+  (doom-modeline-icon t)
+  (doom-modeline-major-mode-icon t)
+  (doom-modeline-lsp t)
+  (doom-modeline-vcs-max-length 24))
+
+(use-package rainbow-delimiters
+  :hook (prog-mode . rainbow-delimiters-mode))
+
+(use-package which-key
+  :ensure nil
+  :init (which-key-mode 1)
+  :custom (which-key-idle-delay 0.4))
+#+end_src
+
+* Completion stack — vertico / orderless / marginalia / consult / embark / corfu
+
+Minibuffer side: =vertico= (vertical list) + =orderless= (fuzzy, space-separated) +
+=marginalia= (annotations) + =consult= (rich commands) + =embark= (act on candidate).
+In-buffer side: =corfu= (popup) + =cape= (completion-at-point extensions).
+
+#+begin_src emacs-lisp
+(use-package vertico
+  :init (vertico-mode 1)
+  :custom (vertico-cycle t))
+
+(use-package orderless
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides
+   '((file (styles basic partial-completion))
+     (eglot (styles orderless))
+     (eglot-capf (styles orderless)))))
+
+(use-package marginalia
+  :init (marginalia-mode 1))
+
+(use-package consult
+  :defer t)
+
+(use-package embark
+  :defer t)
+
+(use-package embark-consult
+  :after (embark consult)
+  :hook (embark-collect-mode . consult-preview-at-point-mode))
+
+(use-package corfu
+  :init (global-corfu-mode 1)
+  :custom
+  (corfu-auto t)
+  (corfu-auto-delay 0.1)
+  (corfu-auto-prefix 2)
+  (corfu-cycle t)
+  (corfu-quit-no-match 'separator)
+  (corfu-preselect 'prompt))
+
+(use-package cape
+  :init
+  (add-to-list 'completion-at-point-functions #'cape-file)
+  (add-to-list 'completion-at-point-functions #'cape-dabbrev))
+#+end_src
+
+* Project, VCS, snippets
+
+#+begin_src emacs-lisp
+(use-package project :ensure nil)
+
+(use-package magit
+  :defer t
+  :custom (magit-display-buffer-function #'magit-display-buffer-fullframe-status-v1))
+
+(use-package yasnippet
+  :init (yas-global-mode 1))
+
+(use-package yasnippet-snippets
+  :after yasnippet)
+#+end_src
+
+* Tree-sitter
+
+Auto-installs grammars on demand and remaps =foo-mode= to =foo-ts-mode= where
+appropriate (including =go-mode= → =go-ts-mode=).
+
+The =c= grammar ships with Arch's =tree-sitter-c= package (in =/usr/lib=, on
+the loader path). The =cpp= grammar is built into =~/.emacs.d/tree-sitter= via
+=M-x treesit-install-language-grammar=; registering the sources here makes that
+reproducible after a wipe.
+
+#+begin_src emacs-lisp
+(with-eval-after-load 'treesit
+  (dolist (src '((c   "https://github.com/tree-sitter/tree-sitter-c")
+                 (cpp "https://github.com/tree-sitter/tree-sitter-cpp")))
+    (add-to-list 'treesit-language-source-alist src)))
+
+(use-package treesit-auto
+  :custom (treesit-auto-install 'prompt)
+  :config
+  (treesit-auto-add-to-auto-mode-alist 'all)
+  (global-treesit-auto-mode))
+#+end_src
+
+* Eglot — LSP
+
+=eglot= is built into Emacs 30. =gopls= is the server. Workspace settings turn
+on gofumpt, staticcheck, inlay hints, unimported completion, and placeholders.
+
+#+begin_src emacs-lisp
+(use-package eglot
+  :ensure nil
+  :defer t
+  :custom
+  (eglot-autoshutdown t)
+  (eglot-events-buffer-size 0)
+  (eglot-sync-connect 1)
+  (eglot-connect-timeout 30)
+  (eglot-extend-to-xref t)
+  :config
+  (setq-default eglot-workspace-configuration
+                '(:gopls (:gofumpt t
+                          :usePlaceholders t
+                          :completeUnimported t
+                          :staticcheck t
+                          :semanticTokens t
+                          :analyses (:unusedparams t
+                                     :shadow t
+                                     :nilness t
+                                     :unusedwrite t
+                                     :useany t)
+                          :hints (:assignVariableTypes t
+                                  :compositeLiteralFields t
+                                  :compositeLiteralTypes t
+                                  :constantValues t
+                                  :functionTypeParameters t
+                                  :parameterNames t
+                                  :rangeVariableTypes t))))
+  ;; Let corfu drive completion; orderless filter the results
+  (add-hook 'eglot-managed-mode-hook
+            (lambda ()
+              ;; Disable the inline gray type annotations (inlay hints)
+              (when (fboundp 'eglot-inlay-hints-mode)
+                (eglot-inlay-hints-mode -1))
+              (setq-local completion-at-point-functions
+                          (list (cape-capf-super
+                                 #'eglot-completion-at-point
+                                 #'cape-file))))))
+
+;; Shared by the per-language modules in lisp/. Adds a buffer-local
+;; format-on-save hook, but only when the LSP server actually advertises
+;; document formatting — so languages whose formatter binary may be absent
+;; (Odin's odinfmt, ts-ls without prettier) never error on save.
+(defun cs/eglot-format-on-save-if-capable ()
+  "Format via eglot before save, only if the server supports it."
+  (add-hook 'before-save-hook
+            (lambda ()
+              (when (and (bound-and-true-p eglot--managed-mode)
+                         (eglot-server-capable :documentFormattingProvider))
+                (eglot-format-buffer)))
+            nil t))
+#+end_src
+
+* Go development
+
+=go-mode= for the major mode + utilities; =treesit-auto= remaps to =go-ts-mode=
+for tree-sitter highlighting. Eglot starts on file open. Save runs gopls
+=source.organizeImports= + format-buffer (gofumpt is configured server-side).
+
+#+begin_src emacs-lisp
+(use-package go-mode :defer t)
+(use-package gotest :after go-mode)
+(use-package go-tag :after go-mode)        ;; gomodifytags wrapper
+(use-package go-impl :after go-mode)       ;; impl wrapper
+(use-package go-gen-test :after go-mode)   ;; gotests wrapper
+
+(defun cs/go-eglot-organize-imports ()
+  "Call gopls' organizeImports source action quietly."
+  (when (and (bound-and-true-p eglot--managed-mode)
+             (fboundp 'eglot-code-actions))
+    (condition-case nil
+        (eglot-code-actions nil nil "source.organizeImports" t)
+      (error nil))))
+
+(defun cs/go-eglot-on-save ()
+  "Format + organize imports via gopls before saving."
+  (add-hook 'before-save-hook #'cs/go-eglot-organize-imports nil t)
+  (add-hook 'before-save-hook #'eglot-format-buffer nil t))
+
+(defun cs/go-setup ()
+  "Common setup for Go buffers."
+  (setq-local tab-width 4
+              indent-tabs-mode t                 ;; Go uses tabs
+              compile-command (if (file-exists-p "Makefile")
+                                  "make "
+                                "go test ./... "))
+  (subword-mode 1)
+  (eglot-ensure)
+  (cs/go-eglot-on-save))
+
+(add-hook 'go-mode-hook    #'cs/go-setup)
+(add-hook 'go-ts-mode-hook #'cs/go-setup)
+
+(defun cs/go-run-file ()
+  "Save and `go run' the current Go file in a *compilation* buffer.
+Runs in the file's directory, so it works for standalone `package main'
+exercises as well as files inside a module."
+  (interactive)
+  (unless buffer-file-name
+    (user-error "Buffer is not visiting a file"))
+  (when (buffer-modified-p)
+    (save-buffer))
+  (compile (concat "go run "
+                   (shell-quote-argument (file-name-nondirectory buffer-file-name)))))
+
+;; Build / run / test keys, bound in the mode maps to avoid global conflicts.
+;; Mirrors the C section's helper pattern (see the NOTE there about dynamic
+;; binding and loop variables — bind via a helper that takes the keymap object).
+(defun cs/go-bind-keys (map)
+  "Add the Go build / run / test / tag / impl keys to keymap MAP."
+  (define-key map (kbd "C-c c")   #'compile)              ;; edit cmd: go build/vet/...
+  (define-key map (kbd "C-c C-c") #'recompile)            ;; re-run last compile
+  (define-key map (kbd "C-c r")   #'cs/go-run-file)       ;; go run THIS file
+  (define-key map (kbd "C-c t t") #'go-test-current-test)
+  (define-key map (kbd "C-c t f") #'go-test-current-file)
+  (define-key map (kbd "C-c t p") #'go-test-current-project)
+  (define-key map (kbd "C-c t b") #'go-test-current-benchmark)
+  (define-key map (kbd "C-c t g") #'go-gen-test-dwim)
+  (define-key map (kbd "C-c t a") #'go-tag-add)
+  (define-key map (kbd "C-c t r") #'go-tag-remove)
+  (define-key map (kbd "C-c t i") #'go-impl))
+
+(with-eval-after-load 'go-mode
+  (cs/go-bind-keys go-mode-map))
+
+(with-eval-after-load 'go-ts-mode
+  (cs/go-bind-keys go-ts-mode-map))
+#+end_src
+
+* C / C++ development
+
+Mirrors the Go setup. =clangd= is the language server (Arch ships it in the
+=clang= package). It reads =compile_commands.json= or =compile_flags.txt= from
+the project root — =reverie= generates the former with =make compdb=, so
+go-to-definition, completion, diagnostics, and hover all work with zero extra
+config. Eglot starts on file open; =M-.= then uses LSP, never =etags=.
+
+Format-on-save runs =clangd='s formatter (which honours the project's
+=.clang-format=) — but *only* when a =.clang-format= actually exists in the
+tree, so we never silently impose LLVM defaults on a codebase that hasn't
+opted in.
+
+#+begin_src emacs-lisp
+;; Prefer clangd with a sensible flag set. add-to-list prepends, so this entry
+;; wins over eglot's built-in ("clangd" "ccls") default for these modes.
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((c-mode c-ts-mode c++-mode c++-ts-mode)
+                 . ("clangd"
+                    "--background-index"
+                    "--clang-tidy"
+                    "--completion-style=detailed"
+                    "--header-insertion=never"
+                    "--pch-storage=memory"
+                    "-j=4"))))
+
+(defun cs/c-format-on-save ()
+  "Format the buffer via clangd before save, but only when the project
+defines a .clang-format — otherwise leave the source untouched."
+  (when (locate-dominating-file
+         (or buffer-file-name default-directory) ".clang-format")
+    (add-hook 'before-save-hook #'eglot-format-buffer nil t)))
+
+(defun cs/c-setup ()
+  "Common setup for C/C++ buffers."
+  (setq-local indent-tabs-mode nil          ;; .clang-format: UseTab: Never
+              tab-width 4
+              c-basic-offset 4
+              c-ts-mode-indent-offset 4
+              compile-command (if (file-exists-p "Makefile")
+                                  "make "
+                                "cc "))
+  (subword-mode 1)
+  (eglot-ensure)
+  (cs/c-format-on-save))
+
+(dolist (hook '(c-mode-hook c-ts-mode-hook c++-mode-hook c++-ts-mode-hook))
+  (add-hook hook #'cs/c-setup))
+
+(defun cs/clangd-other-file ()
+  "Jump between a C/C++ source file and its header via clangd.
+Smarter than name-matching — clangd uses the include graph."
+  (interactive)
+  (let* ((server (eglot-current-server))
+         (uri (and server
+                   (eglot--request server :textDocument/switchSourceHeader
+                                   (eglot--TextDocumentIdentifier)))))
+    (if (and (stringp uri) (not (string-empty-p uri)))
+        (find-file (eglot-uri-to-path uri))
+      (user-error "clangd: no matching source/header"))))
+
+;; Build/recompile and source/header switch from any C buffer.
+;; NOTE: the tangled config.el has no lexical-binding cookie, so it loads with
+;; dynamic binding — never close over a loop variable inside `with-eval-after-load`.
+;; Bind via a helper that takes the keymap object, mirroring the Go section.
+(defun cs/c-bind-keys (map)
+  "Add the C build / navigation keys to keymap MAP."
+  (define-key map (kbd "C-c c")   #'compile)
+  (define-key map (kbd "C-c C-c") #'recompile)
+  (define-key map (kbd "C-c o")   #'cs/clangd-other-file))
+
+(with-eval-after-load 'cc-mode
+  (cs/c-bind-keys c-mode-map)
+  (cs/c-bind-keys c++-mode-map))
+
+(with-eval-after-load 'c-ts-mode
+  (cs/c-bind-keys c-ts-mode-map)
+  (cs/c-bind-keys c++-ts-mode-map))
+#+end_src
+
+* Debugging — dape (Delve)
+
+=dape= is a modern Debug Adapter Protocol client with no Node dependency.
+Uses =dlv= directly.
+
+#+begin_src emacs-lisp
+(use-package dape
+  :defer t
+  :custom
+  (dape-buffer-window-arrangement 'right)
+  (dape-inlay-hints t))
+#+end_src
+
+* Flymake (built-in diagnostics)
+
+#+begin_src emacs-lisp
+(use-package flymake
+  :ensure nil
+  :hook (prog-mode . flymake-mode)
+  :custom (flymake-no-changes-timeout 0.5))
+#+end_src
+
+* Writing setup (preserved from prior config)
+
+#+begin_src emacs-lisp
+(use-package org
+  :ensure nil
+  :config
+  (setq org-startup-truncated nil
+        org-startup-indented t
+        org-hide-emphasis-markers t
+        org-pretty-entities t
+        org-fontify-whole-heading-line t
+        org-fontify-done-headline t
+        org-fontify-quote-and-verse-blocks t
+        org-hidden-keywords '(title date author startup)
+        org-default-notes-file (expand-file-name "~/books/notes.org"))
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (setq fill-column 80)
+              (turn-on-auto-fill)
+              ;; Larger font for writing — buffer-local
+              (face-remap-add-relative 'default :height 140))))
+
+(use-package writeroom-mode
+  :defer t
+  :custom
+  (writeroom-width 100)
+  (writeroom-mode-line t)
+  (writeroom-globaleffects nil))
+
+(use-package org-wc
+  :after org
+  :hook (org-mode . org-wc-mode))
+
+(use-package flyspell
+  :ensure nil
+  :hook (org-mode . flyspell-mode)
+  :custom (flyspell-issue-message-flag nil))
+#+end_src
+
+* Global keybindings
+
+Conservative additions only. No overrides of mode-specific defaults.
+Go-mode test/tag/impl keys are bound in =go-mode-map= above (see Go section)
+and =writeroom= / =flyspell-mode= retain their original toggles.
+
+#+begin_src emacs-lisp
+;; Existing toggles
+(global-set-key (kbd "C-c w") #'writeroom-mode)        ;; was bound in old config
+(global-set-key (kbd "C-c s") #'flyspell-mode)         ;; was bound in old config
+(global-set-key (kbd "C-x C-b") #'ibuffer)             ;; was bound in old config
+
+;; New, non-conflicting additions
+(global-set-key (kbd "C-x g")   #'magit-status)        ;; community standard
+(global-set-key (kbd "C-c .")   #'embark-act)
+(global-set-key (kbd "C-c d")   #'dape)                ;; debug
+(global-set-key (kbd "C-c =")   (lambda () (interactive) (text-scale-adjust +1)))
+(global-set-key (kbd "C-c -")   (lambda () (interactive) (text-scale-adjust -1)))
+(global-set-key (kbd "C-c 0")   (lambda () (interactive) (text-scale-adjust 0)))
+
+;; Find / search "everything" (C-c f …) and M-y live in lisp/quick-search.el,
+;; which owns the Telescope-style fuzzy-search keymap as the single source of
+;; truth. Language build/run keys (C-c c / C-c r / …) live in lisp/lang-*.el.
+#+end_src
+
+* Welcome
+
+#+begin_src emacs-lisp
+(defun cs/welcome ()
+  (message "Emacs %s ready — Go: C-c r run · C-c c compile · C-c t <k> test, Magit: C-x g"
+           emacs-version))
+(add-hook 'after-init-hook #'cs/welcome)
+#+end_src
