@@ -88,7 +88,22 @@
    `(eww-highlighted ((,class (:foreground ,orange :weight bold))))
    `(eww-plain-text ((,class (:foreground ,foreground))))
    `(eww-table ((,class (:foreground ,foreground :background ,block-background))))
-   `(eww-code ((,class (:foreground ,warm-amber :background ,block-background :box (:line-width 1 :color ,gray)))))))
+   `(eww-code ((,class (:foreground ,warm-amber :background ,block-background :box (:line-width 1 :color ,gray)))))
+
+   ;; Search, match, and paren highlighting — kept within the theme palette so
+   ;; nothing falls back to Emacs' default pink (isearch) / turquoise (lazy)
+   ;; match faces.
+   `(isearch ((,class (:background ,orange :foreground ,background :weight bold)))) ;; current search hit
+   `(isearch-fail ((,class (:background ,red :foreground ,background)))) ;; failed search
+   `(isearch-group-1 ((,class (:background ,warm-amber :foreground ,background)))) ;; regexp group 1
+   `(isearch-group-2 ((,class (:background ,blue :foreground ,background)))) ;; regexp group 2
+   `(lazy-highlight ((,class (:background ,selection :foreground ,foreground)))) ;; the other matches
+   `(query-replace ((,class (:background ,orange :foreground ,background :weight bold)))) ;; replace target
+   `(match ((,class (:background ,selection :foreground ,foreground)))) ;; occur / grep / completion matches
+   `(show-paren-match ((,class (:background ,selection :foreground ,orange :weight bold)))) ;; matching paren
+   `(show-paren-match-expression ((,class (:background ,block-background)))) ;; whole sexp match
+   `(show-paren-mismatch ((,class (:background ,red :foreground ,background :weight bold)))) ;; unmatched paren
+   `(secondary-selection ((,class (:background ,block-background :foreground ,foreground))))))
 
 ;;;###autoload
 (when (and (boundp 'custom-theme-load-path)

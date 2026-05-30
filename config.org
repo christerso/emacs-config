@@ -129,10 +129,15 @@ that gets flaky with eglot).
   (when (memq window-system '(mac ns x pgtk))
     (exec-path-from-shell-initialize))
   (unless (window-system) (exec-path-from-shell-initialize))
-  ;; Make sure ~/go/bin is on PATH/exec-path even if the shell missed it
-  (let ((gobin (expand-file-name "~/go/bin")))
-    (add-to-list 'exec-path gobin)
-    (setenv "PATH" (concat gobin ":" (getenv "PATH")))))
+  ;; Make sure user bin dirs are on PATH/exec-path even if the login shell
+  ;; missed them. ~/.local/bin (odin etc.) is added in .zshrc, which a
+  ;; non-interactive login shell doesn't source — so exec-path-from-shell can't
+  ;; see it. Add these explicitly so M-x compile and friends find the tools.
+  (dolist (dir '("~/go/bin" "~/.local/bin"))
+    (let ((bin (expand-file-name dir)))
+      (when (file-directory-p bin)
+        (add-to-list 'exec-path bin)
+        (setenv "PATH" (concat bin ":" (getenv "PATH")))))))
 
 (use-package envrc
   :hook (after-init . envrc-global-mode))
@@ -358,6 +363,7 @@ for tree-sitter highlighting. Eglot starts on file open. Save runs gopls
   "Common setup for Go buffers."
   (setq-local tab-width 4
               indent-tabs-mode t                 ;; Go uses tabs
+              go-ts-mode-indent-offset 4         ;; match tab-width: 1 level = 1 tab (gofmt), not 2
               compile-command (if (file-exists-p "Makefile")
                                   "make "
                                 "go test ./... "))
@@ -562,6 +568,8 @@ and =writeroom= / =flyspell-mode= retain their original toggles.
 ;; New, non-conflicting additions
 (global-set-key (kbd "C-x g")   #'magit-status)        ;; community standard
 (global-set-key (kbd "C-c .")   #'embark-act)
+(global-set-key (kbd "C-.")     #'xref-find-definitions) ;; jump to symbol's origin (LSP via eglot); M-, jumps back
+(global-set-key (kbd "C-,")     #'xref-find-references)  ;; find all references / usages (LSP via eglot)
 (global-set-key (kbd "C-c d")   #'dape)                ;; debug
 (global-set-key (kbd "C-c =")   (lambda () (interactive) (text-scale-adjust +1)))
 (global-set-key (kbd "C-c -")   (lambda () (interactive) (text-scale-adjust -1)))
