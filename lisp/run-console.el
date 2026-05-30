@@ -99,7 +99,22 @@ Interactively, offers a project-aware default; edit then RET to confirm."
              command (file-name-nondirectory term) default-directory)
     (apply #'start-process "cs-console" nil argv)))
 
-(global-set-key (kbd "C-c m r") #'cs/console-run)
+(defun cs/console-run-default ()
+  "Save buffers, then build+run the current project immediately — no prompt.
+Uses the project-aware default from `cs/console--default-command' (for Odin
+that is `odin run src' / `odin run .', which compiles and runs in one step) and
+launches it in the persistent console.  If the project type is unknown, falls
+back to the editable `cs/console-run' prompt."
+  (interactive)
+  (save-some-buffers t)
+  (let ((cmd (string-trim (cs/console--default-command))))
+    (if (string-empty-p cmd)
+        (call-interactively #'cs/console-run)
+      (cs/console-run cmd))))
+
+(global-set-key (kbd "C-<return>") #'cs/console-run-default) ;; immediate build+run
+(global-set-key (kbd "C-c m m")    #'cs/console-run-default) ;; same, mnemonic
+(global-set-key (kbd "C-c m r")    #'cs/console-run)         ;; editable run
 
 (with-eval-after-load 'which-key
   (which-key-add-key-based-replacements "C-c m" "make/run"))

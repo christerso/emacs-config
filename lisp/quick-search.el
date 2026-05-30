@@ -26,31 +26,46 @@
         vertico-resize t))
 
 ;; ---------------------------------------------------------------------------
-;; The "find / search everything" keymap — C-c f <key>
+;; The "find / search everything" prefix map.
 ;; Mnemonics mirror LazyVim: f=files, g=grep, b=buffers, r=recent, l=lines …
 ;; ---------------------------------------------------------------------------
-(global-set-key (kbd "C-c f f") #'find-file)             ;; file by path
-(global-set-key (kbd "C-c f p") #'project-find-file)     ;; <leader>ff: file in project
-(global-set-key (kbd "C-c f d") #'consult-fd)            ;; fast find anywhere (fd)
-(global-set-key (kbd "C-c f r") #'consult-recent-file)   ;; recent files
-(global-set-key (kbd "C-c f g") #'consult-ripgrep)       ;; <leader>sg: live grep project
-(global-set-key (kbd "C-c f l") #'consult-line)          ;; search lines in buffer
-(global-set-key (kbd "C-c f b") #'consult-buffer)        ;; switch buffer (preview)
-(global-set-key (kbd "C-c f j") #'consult-imenu)         ;; symbol in file
-(global-set-key (kbd "C-c f i") #'consult-imenu-multi)   ;; symbol across buffers
-(global-set-key (kbd "C-c f o") #'consult-outline)       ;; outline / headings
-(global-set-key (kbd "C-c f m") #'consult-mark)          ;; jump to a mark
-(global-set-key (kbd "C-c f e") #'consult-flymake)       ;; diagnostics
-(global-set-key (kbd "C-c f G") #'consult-git-grep)      ;; grep tracked files
+(defvar cs/search-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "f" #'find-file)           ;; file by path
+    (define-key map "p" #'project-find-file)   ;; <leader>ff: file in project
+    (define-key map "d" #'consult-fd)          ;; fast find anywhere (fd)
+    (define-key map "r" #'consult-recent-file) ;; recent files
+    (define-key map "g" #'consult-ripgrep)     ;; <leader>sg: live grep project
+    (define-key map "l" #'consult-line)        ;; search lines in buffer
+    (define-key map "b" #'consult-buffer)      ;; switch buffer (preview)
+    (define-key map "B" #'ibuffer)             ;; full buffer manager
+    (define-key map "j" #'consult-imenu)       ;; symbol in file
+    (define-key map "i" #'consult-imenu-multi) ;; symbol across buffers
+    (define-key map "o" #'consult-outline)     ;; outline / headings
+    (define-key map "m" #'consult-mark)        ;; jump to a mark
+    (define-key map "e" #'consult-flymake)     ;; diagnostics
+    (define-key map "G" #'consult-git-grep)    ;; grep tracked files
+    map)
+  "Telescope-style find/search prefix keymap.")
+
+;; Bound to BOTH C-c f and C-x f — the latter replaces the default
+;; `set-fill-column' (easy to fat-finger when reaching for find), so the two
+;; prefixes are now identical fuzzy-search entry points.
+(global-set-key (kbd "C-c f") cs/search-map)
+(global-set-key (kbd "C-x f") cs/search-map)
 
 ;; Make the everyday buffer commands use consult's fuzzy, previewed menu.
-;; Both C-x b and C-x C-b now open the fancy fuzzy-find buffer list; the plain
-;; ibuffer manager is still one key away on C-c f B.
+;; Both C-x b and C-x C-b open the fuzzy-find buffer list; the plain ibuffer
+;; manager stays one key away on  C-c f B / C-x f B.
 (global-set-key (kbd "C-x b")   #'consult-buffer)
 (global-set-key (kbd "C-x C-b") #'consult-buffer)
-(global-set-key (kbd "C-c f B") #'ibuffer)
 (with-eval-after-load 'consult
   (global-set-key (kbd "M-y") #'consult-yank-pop))
+
+(with-eval-after-load 'which-key
+  (which-key-add-key-based-replacements
+    "C-c f" "find/search"
+    "C-x f" "find/search"))
 
 (provide 'quick-search)
 ;;; quick-search.el ends here

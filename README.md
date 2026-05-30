@@ -33,7 +33,7 @@ generic `compile`/`recompile` workflow (no hardcoded project paths).
 [corfu](https://github.com/minad/corfu)/[cape](https://github.com/minad/cape).
 Minibuffer icons via [nerd-icons-completion](https://github.com/rainstormstudio/nerd-icons-completion).
 
-### Search keys (`C-c f …`)
+### Search keys (`C-c f …`, also on `C-x f …`)
 
 | Key | Action | LazyVim analogue |
 |-----|--------|------------------|
@@ -53,11 +53,16 @@ Minibuffer icons via [nerd-icons-completion](https://github.com/rainstormstudio/
 Go adds `C-c t <k>` tests; C/C++ adds `C-c o` source↔header; Zig adds `C-c t` test;
 SQL uses `C-c C-f` to format.
 
-`C-c m r` runs the project's program in a **real external terminal that stays
-open** after exit (prints the exit code, waits for Enter — so crashes are
-readable). The run command is guessed from the project and editable. Terminal
-auto-detects (ghostty/kitty/alacritty/konsole/…); override with
-`(setq cs/console-terminal "konsole")`.
+`C-RET` (or `C-c m m`) **immediately** saves and build-runs the current project
+in a **real external terminal that stays open** after exit (prints the exit
+code, waits for Enter — so crashes are readable). No prompt — for an Odin
+project it runs `odin run src` (compile + run in one step); also handles
+Zig/Go/C and Makefile `run` targets. `C-c m r` is the same but lets you edit
+the command first. Terminal auto-detects (ghostty/kitty/alacritty/konsole/…);
+override with `(setq cs/console-terminal "konsole")`.
+
+For in-editor compile with clickable error jumps, use `C-c c` (compile) /
+`C-c C-c` (recompile) instead.
 
 ## Requirements
 
