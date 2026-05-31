@@ -239,7 +239,14 @@ In-buffer side: =corfu= (popup) + =cape= (completion-at-point extensions).
   :init (marginalia-mode 1))
 
 (use-package consult
-  :defer t)
+  :defer t
+  :init
+  ;; Show xref results — find-references (C-, / M-?) and find-definitions
+  ;; (C-. / M-.) — in a consult list: fuzzy-filtered, with live preview, instead
+  ;; of the plain *xref* buffer. These keys are identical in EVERY language,
+  ;; because eglot registers one uniform xref backend (gopls, clangd, ts-ls …).
+  (setq xref-show-xrefs-function #'consult-xref
+        xref-show-definitions-function #'consult-xref))
 
 (use-package embark
   :defer t)
@@ -311,6 +318,55 @@ while a suggestion is showing, so these never shadow anything otherwise.
 
 (use-package yasnippet-snippets
   :after yasnippet)
+#+end_src
+
+* Git gutter, TODO highlighting, editable grep
+
+=diff-hl= paints VCS diff bars in the fringe — the "git gutter" — and refreshes
+after every magit commit. =hl-todo= highlights TODO/FIXME/HACK/… in code.
+=wgrep= makes =consult-ripgrep= results editable: run a grep, =embark-export=
+(=C-c . E=) to a grep buffer, =C-c C-p= to edit, then =C-x C-s= — that is
+project-wide find/replace.
+
+The hunk actions live under a =C-c g= ("git-hunk") prefix.
+
+#+begin_src emacs-lisp
+(use-package diff-hl
+  :hook ((after-init        . global-diff-hl-mode)
+         (magit-pre-refresh  . diff-hl-magit-pre-refresh)
+         (magit-post-refresh . diff-hl-magit-post-refresh)
+         (dired-mode         . diff-hl-dired-mode))
+  :custom (diff-hl-draw-borders nil)
+  :config
+  (diff-hl-flydiff-mode 1)            ;; update the bars live, before saving
+  (defvar cs/diff-hl-map
+    (let ((m (make-sparse-keymap)))
+      (define-key m "n" #'diff-hl-next-hunk)
+      (define-key m "p" #'diff-hl-previous-hunk)
+      (define-key m "s" #'diff-hl-stage-dwim)       ;; stage the hunk / region
+      (define-key m "k" #'diff-hl-revert-hunk)      ;; revert (kill) the hunk
+      (define-key m "d" #'diff-hl-diff-goto-hunk)   ;; show the hunk's diff
+      m)
+    "Hunk actions under the C-c g prefix.")
+  (global-set-key (kbd "C-c g") cs/diff-hl-map))
+
+(with-eval-after-load 'which-key
+  (which-key-add-key-based-replacements "C-c g" "git-hunk"))
+
+(use-package hl-todo
+  :hook (prog-mode . hl-todo-mode)
+  :custom
+  (hl-todo-keyword-faces
+   '(("TODO"  . "#d7af5f")
+     ("FIXME" . "#ff5f5f")
+     ("HACK"  . "#af87ff")
+     ("XXX"   . "#ff5f5f")
+     ("NOTE"  . "#5fafd7")))
+  :bind (:map hl-todo-mode-map
+              ("M-s t" . hl-todo-occur)))   ;; list this buffer's TODO/FIXME
+
+(use-package wgrep
+  :init (with-eval-after-load 'grep (require 'wgrep)))
 #+end_src
 
 * Tree-sitter

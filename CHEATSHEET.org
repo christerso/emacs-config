@@ -46,10 +46,21 @@ errors with =M-g n= / =M-g p= (see Diagnostics).
 | =M-y=       | consult-yank-pop    | Paste from kill-ring with preview       |
 
 * Version control / debug  (global)
-| Key     | Command       | Does                          |
-|---------+---------------+-------------------------------|
-| =C-x g=   | magit-status  | Git porcelain                 |
-| =C-c d=   | dape          | Start the debugger (Delve)    |
+| Key       | Command                | Does                                |
+|-----------+------------------------+-------------------------------------|
+| =C-x g=     | magit-status           | Git porcelain                       |
+| =C-c d=     | dape                   | Start the debugger (Delve)          |
+| =C-c g n=   | diff-hl-next-hunk      | Next changed hunk (git gutter)      |
+| =C-c g p=   | diff-hl-previous-hunk  | Previous changed hunk               |
+| =C-c g s=   | diff-hl-stage-dwim     | Stage the hunk / region             |
+| =C-c g k=   | diff-hl-revert-hunk    | Revert (kill) the hunk              |
+| =C-c g d=   | diff-hl-diff-goto-hunk | Show the hunk's diff                |
+| =M-s t=     | hl-todo-occur          | List TODO/FIXME in this buffer      |
+
+Git gutter (=diff-hl=) shows add/change/delete bars in the fringe, live as you
+type, and refreshes after magit commits. Editable grep: =C-c f g= (ripgrep) →
+=C-c . E= (embark-export) → =C-c C-p= (wgrep) → edit → =C-x C-s= for
+project-wide find/replace.
 
 * Writing & display  (global)
 | Key     | Command          | Does                                |
@@ -60,13 +71,16 @@ errors with =M-g n= / =M-g p= (see Diagnostics).
 | =C-c -=   | text-scale -1    | Smaller text                        |
 | =C-c 0=   | text-scale reset | Reset text size                     |
 
-* LSP — eglot  /(no custom keys; use M-x or defaults)/
-Eglot starts automatically in Go and C/C++ buffers (=eglot-ensure=).
+* LSP — eglot
+Eglot starts automatically in every language buffer (=eglot-ensure=). These
+navigation keys are the SAME in every language — Go (gopls), C/C++ (clangd),
+TS/JS, … — because eglot registers one uniform xref backend. Results open in a
+fuzzy, previewable consult list.
 | Key / Command          | Does                                          |
 |------------------------+-----------------------------------------------|
-| =M-.=  /(xref)/          | Go to definition                              |
+| =C-.= or =M-.=           | Go to definition                              |
+| =C-,= or =M-?=           | *Find references / all usages*                |
 | =M-,=  /(xref)/          | Jump back                                     |
-| =M-?=  /(xref)/          | Find references                               |
 | =M-x eglot-rename=       | Rename symbol project-wide                    |
 | =M-x eglot-code-actions= | Offer quick-fixes / refactors at point        |
 | =M-x eglot-format=       | Format region/buffer via the server           |
