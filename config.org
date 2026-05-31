@@ -169,7 +169,7 @@ that gets flaky with eglot).
   ;; missed them. ~/.local/bin (odin etc.) is added in .zshrc, which a
   ;; non-interactive login shell doesn't source — so exec-path-from-shell can't
   ;; see it. Add these explicitly so M-x compile and friends find the tools.
-  (dolist (dir '("~/go/bin" "~/.local/bin"))
+  (dolist (dir '("~/go/bin" "~/.local/bin" "~/.npm-global/bin"))
     (let ((bin (expand-file-name dir)))
       (when (file-directory-p bin)
         (add-to-list 'exec-path bin)

@@ -32,7 +32,8 @@
                   "lang-sql"
                   "lang-tsjs"
                   "lang-formats"
-                  "lang-markdown"))
+                  "lang-markdown"
+                  "json-fix"))
   (load module nil 'nomessage))
 
 ;;; init.el ends here
