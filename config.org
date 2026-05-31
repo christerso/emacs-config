@@ -605,17 +605,38 @@ for tree-sitter highlighting. Eglot starts on file open. Save runs gopls
 (add-hook 'go-mode-hook    #'cs/go-setup)
 (add-hook 'go-ts-mode-hook #'cs/go-setup)
 
+(defun cs/go--main-file-count (dir)
+  "Count the non-test .go files in DIR that define `func main'.
+One means a normal program (possibly spread across several files); more than
+one means a directory of standalone single-file exercises."
+  (let ((count 0))
+    (dolist (f (directory-files dir t "\\.go\\'"))
+      (unless (string-suffix-p "_test.go" f)
+        (with-temp-buffer
+          (insert-file-contents f)
+          (goto-char (point-min))
+          (when (re-search-forward "^func main(" nil t)
+            (setq count (1+ count))))))
+    count))
+
 (defun cs/go-run-file ()
-  "Save and `go run' the current Go file in a *compilation* buffer.
-Runs in the file's directory, so it works for standalone `package main'
-exercises as well as files inside a module."
+  "Save and run the current Go program in a *compilation* buffer.
+
+Uses `go run .' (the whole package in this directory) so multi-file packages
+like a real app build correctly — `go run thisfile.go' would miss the package's
+other files and report them as undefined.  Falls back to `go run THISFILE' only
+when the directory holds several standalone `package main' files, each its own
+program (the exercise layout), where `go run .' cannot pick just one."
   (interactive)
   (unless buffer-file-name
     (user-error "Buffer is not visiting a file"))
   (when (buffer-modified-p)
     (save-buffer))
-  (compile (concat "go run "
-                   (shell-quote-argument (file-name-nondirectory buffer-file-name)))))
+  (let ((cmd (if (> (cs/go--main-file-count default-directory) 1)
+                 (concat "go run "
+                         (shell-quote-argument (file-name-nondirectory buffer-file-name)))
+               "go run .")))
+    (compile cmd)))
 
 ;; Build / run / test keys, bound in the mode maps to avoid global conflicts.
 ;; Mirrors the C section's helper pattern (see the NOTE there about dynamic
