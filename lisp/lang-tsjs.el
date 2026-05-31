@@ -30,9 +30,9 @@
 
 (defun cs/tsjs-setup ()
   "Common setup for TypeScript / JavaScript buffers."
-  (setq-local tab-width 2                   ;; JS/TS community convention
-              js-indent-level 2
-              typescript-ts-mode-indent-offset 2)
+  (setq-local tab-width 4                   ;; uniform 4-column indent (see config.org)
+              js-indent-level 4
+              typescript-ts-mode-indent-offset 4)
   (subword-mode 1)
   (when (executable-find "typescript-language-server")
     (eglot-ensure))

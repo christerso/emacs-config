@@ -24,11 +24,13 @@
 ;; quick-search and the lang modules depend on helpers/packages from config.org.
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 (dolist (module '("quick-search"
+                  "session-layout"
                   "run-console"
                   "lang-odin"
                   "lang-zig"
                   "lang-sql"
-                  "lang-tsjs"))
+                  "lang-tsjs"
+                  "lang-formats"))
   (load module nil 'nomessage))
 
 ;;; init.el ends here

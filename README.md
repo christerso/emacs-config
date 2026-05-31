@@ -37,7 +37,9 @@ Minibuffer icons via [nerd-icons-completion](https://github.com/rainstormstudio/
 
 | Key | Action | LazyVim analogue |
 |-----|--------|------------------|
-| `C-c f p` | find file in project | `<leader>ff` |
+| `C-c f f` | fuzzy find file by name (project, else fd) | `<leader>ff` |
+| `C-c f p` | find file in project (explicit) | `<leader>ff` |
+| `C-c f F` | plain path prompt (`find-file`) | — |
 | `C-c f d` | fast file find (fd) anywhere | `<leader>ff` |
 | `C-c f g` | live grep project (ripgrep) | `<leader>sg` |
 | `C-c f l` | search lines in buffer | `<leader>sb` |

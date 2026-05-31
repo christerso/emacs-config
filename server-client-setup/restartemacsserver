@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+# restartemacsserver — restart the Emacs user daemon, preserving open buffers
+# and the window layout. Symlinked onto PATH from ~/.local/bin.
+#
+# Safe because it saves first: open file buffers are written, the desktop
+# (buffer list) is persisted, and lisp/session-layout.el persists the window
+# splits on kill-emacs. After the restart, init.el re-tangles config.org.
+
+set -eu
+
+if emacsclient -e t >/dev/null 2>&1; then
+    echo "saving buffers + desktop..."
+    emacsclient -e '(save-some-buffers t)' >/dev/null 2>&1 || true
+    emacsclient -e '(when (fboundp (quote desktop-save-in-desktop-dir)) (desktop-save-in-desktop-dir))' >/dev/null 2>&1 || true
+else
+    echo "daemon not reachable; starting fresh."
+fi
+
+echo "restarting emacs.service..."
+systemctl --user restart emacs
+
+# Wait for the socket to come back.
+tries=0
+until emacsclient -e t >/dev/null 2>&1 || [ "$tries" -ge 30 ]; do
+    sleep 1
+    tries=$((tries + 1))
+done
+
+if emacsclient -e t >/dev/null 2>&1; then
+    echo "up: $(emacsclient -e '(emacs-version)' 2>/dev/null | tr -d '"' | head -1)"
+else
+    echo "WARNING: daemon did not come back within ${tries}s — check: journalctl --user -u emacs -n 40" >&2
+    exit 1
+fi

@@ -20,7 +20,8 @@
   :config
   (add-hook 'sql-mode-hook
             (lambda ()
-              (setq-local tab-width 4)
+              (setq-local tab-width 4
+                          sqlind-basic-offset 4)   ;; default is 2; keep 4 like everything else
               (when (and (executable-find "sqls") (fboundp 'eglot-ensure))
                 (eglot-ensure)))))
 

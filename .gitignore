@@ -34,3 +34,9 @@ init.el.bak-*
 *~
 \#*\#
 .\#*
+
+# project.el recent-project list (runtime state)
+/projects
+
+# session-layout.el window snapshot (runtime state)
+/last-session-layout.el

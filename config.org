@@ -24,7 +24,15 @@ handler is muted while loading to skip remote-file checks.
 
 #+begin_src emacs-lisp
 (setq inhibit-startup-screen t
-      initial-scratch-message nil
+      ;; A short banner so a fresh frame's empty *scratch* never reads as a dead
+      ;; black window in the dark theme. Comment lines (lisp-interaction-mode), so
+      ;; they don't interfere with evaluating expressions below them.
+      initial-scratch-message
+      (concat ";; *scratch* — Lisp Interaction.  Not a file; nothing here is saved.\n"
+              ";; C-j evaluates the expression before point and prints the result.\n"
+              ";;\n"
+              ";;   find file  C-c f f      recent  C-c f r      grep  C-c f g\n"
+              ";;   buffers    C-x b        magit   C-x g        defs  C-.\n\n")
       ring-bell-function 'ignore
       use-short-answers t                       ;; y/n instead of yes/no
       create-lockfiles nil
@@ -37,6 +45,19 @@ handler is muted while loading to skip remote-file checks.
 (setq-default indent-tabs-mode nil
               tab-width 4
               fill-column 100)
+
+;; One indentation WIDTH everywhere — 4 columns, regardless of language. Each
+;; language module keeps its own tabs-vs-spaces choice (Go and Odin need real
+;; tabs for gofmt/odinfmt; C/JS/TS/SQL use spaces) but every indent level steps
+;; the same 4 columns, so nothing looks different jumping between files. These
+;; cover the modes without a dedicated module in lisp/ (json, css, html); the
+;; per-language setups pin the same 4 for the modes they own.
+(setq standard-indent 4
+      js-indent-level 4
+      json-ts-mode-indent-offset 4
+      css-indent-offset 4
+      sgml-basic-offset 4
+      typescript-ts-mode-indent-offset 4)
 
 (global-auto-revert-mode 1)
 (setq global-auto-revert-non-file-buffers t
@@ -155,6 +176,14 @@ Custom theme dir is added so the local =voidlight-theme.el= is picked up.
 (scroll-bar-mode -1)
 (menu-bar-mode -1)
 
+;; Pin a default frame geometry. This Emacs is the X11/GTK build running under
+;; XWayland (Wayland session, DISPLAY :0); without an explicit size the
+;; compositor hands new `emacsclient -c' frames no geometry, so they spawn at
+;; the minimum 8x5 — a tiny black speck that looks like a dead window. Giving
+;; default-frame-alist a real width/height makes every client frame usable.
+(dolist (param '((width . 120) (height . 40) (left . 200) (top . 120)))
+  (add-to-list 'default-frame-alist param))
+
 ;; JetBrains Mono Nerd Font (NL = no-ligatures, NFM = Nerd Font Mono variant).
 ;; Installed via `ttf-jetbrains-mono-nerd'. `fixed-pitch' is matched too so org
 ;; code blocks and tables share the same glyphs (and the nerd-font icons).
@@ -235,6 +264,39 @@ In-buffer side: =corfu= (popup) + =cape= (completion-at-point extensions).
   (add-to-list 'completion-at-point-functions #'cape-dabbrev))
 #+end_src
 
+* GitHub Copilot — AI ghost-text completions
+
+The Neovim side has Copilot via =copilot.lua=; this is the Emacs equivalent
+([[https://github.com/copilot-emacs/copilot.el][copilot-emacs/copilot.el]]).  It is a *separate* layer from corfu: corfu is
+the popup of LSP/dabbrev candidates you filter by typing, while Copilot paints
+a greyed-out multi-line suggestion inline as you type.  They coexist — corfu's
+popup and Copilot's ghost text can both be on screen at once.
+
+Two one-time external steps are required before suggestions appear, neither of
+which lives in this file: =M-x copilot-install-server= (downloads the Copilot
+language server via npm — needs =node=, present as v26) and =M-x copilot-login=
+(GitHub device-code auth in the browser).  After that, =copilot-mode= turns on
+in every =prog-mode= buffer.
+
+Accept keys are chosen to work in *both* GUI and TTY Emacs.  =C-<tab>= is the
+GUI accept; a raw terminal can't transmit that, so =M-RET= (Alt-Enter, which
+Alacritty *can* send) accepts too.  The =copilot-completion-map= is only live
+while a suggestion is showing, so these never shadow anything otherwise.
+
+#+begin_src emacs-lisp
+(use-package copilot
+  :hook (prog-mode . copilot-mode)
+  :custom
+  (copilot-idle-delay 0.15)            ;; show ghost text shortly after you pause
+  :bind (:map copilot-completion-map
+              ("C-<tab>"   . copilot-accept-completion)         ;; GUI accept (whole)
+              ("M-RET"     . copilot-accept-completion)         ;; TTY-safe accept (whole)
+              ("M-<right>" . copilot-accept-completion-by-word) ;; accept one word
+              ("M-n"       . copilot-next-completion)           ;; cycle suggestions
+              ("M-p"       . copilot-previous-completion)
+              ("C-g"       . copilot-clear-overlay)))           ;; dismiss
+#+end_src
+
 * Project, VCS, snippets
 
 #+begin_src emacs-lisp
@@ -257,14 +319,23 @@ Auto-installs grammars on demand and remaps =foo-mode= to =foo-ts-mode= where
 appropriate (including =go-mode= → =go-ts-mode=).
 
 The =c= grammar ships with Arch's =tree-sitter-c= package (in =/usr/lib=, on
-the loader path). The =cpp= grammar is built into =~/.emacs.d/tree-sitter= via
-=M-x treesit-install-language-grammar=; registering the sources here makes that
-reproducible after a wipe.
+the loader path). The =cpp=, =json=, =yaml=, =bash=, =toml=, =dockerfile= and
+=cmake= grammars are built into =~/.emacs.d/tree-sitter= via =M-x
+treesit-install-language-grammar=; registering the sources here makes that
+reproducible after a wipe. =treesit-auto= remaps each to its built-in
+=*-ts-mode=. Schema formats without a tree-sitter mode (Protocol Buffers, Cap'n
+Proto) live in =lisp/lang-formats.el= instead.
 
 #+begin_src emacs-lisp
 (with-eval-after-load 'treesit
-  (dolist (src '((c   "https://github.com/tree-sitter/tree-sitter-c")
-                 (cpp "https://github.com/tree-sitter/tree-sitter-cpp")))
+  (dolist (src '((c          "https://github.com/tree-sitter/tree-sitter-c")
+                 (cpp        "https://github.com/tree-sitter/tree-sitter-cpp")
+                 (json       "https://github.com/tree-sitter/tree-sitter-json")
+                 (yaml       "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
+                 (bash       "https://github.com/tree-sitter/tree-sitter-bash")
+                 (toml       "https://github.com/tree-sitter-grammars/tree-sitter-toml")
+                 (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")
+                 (cmake      "https://github.com/uyha/tree-sitter-cmake")))
     (add-to-list 'treesit-language-source-alist src)))
 
 (use-package treesit-auto
@@ -272,6 +343,11 @@ reproducible after a wipe.
   :config
   (treesit-auto-add-to-auto-mode-alist 'all)
   (global-treesit-auto-mode))
+
+;; `cmake-ts-mode' ships no `auto-mode-alist' entry and treesit-auto does not
+;; add one, so CMake files fall back to text-mode. Register the conventional
+;; names explicitly (the grammar is built above).
+(add-to-list 'auto-mode-alist '("\\(?:CMakeLists\\.txt\\|\\.cmake\\)\\'" . cmake-ts-mode))
 #+end_src
 
 * Eglot — LSP
@@ -331,6 +407,26 @@ on gofumpt, staticcheck, inlay hints, unimported completion, and placeholders.
                          (eglot-server-capable :documentFormattingProvider))
                 (eglot-format-buffer)))
             nil t))
+#+end_src
+
+* JSON
+
+=json-ts-mode= (tree-sitter) for highlighting; =vscode-json-language-server=
+(from the npm package =vscode-langservers-extracted=, on =~/.npm-global/bin=)
+under eglot for linting *and* JSON-Schema validation, surfaced through flymake
+like every other language. Format on save when the server advertises it.
+
+=treesit-auto= already remaps =.json= → =json-ts-mode=; here we just start the
+LSP and add format-on-save.
+
+#+begin_src emacs-lisp
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((json-ts-mode js-json-mode)
+                 . ("vscode-json-language-server" "--stdio"))))
+
+(add-hook 'json-ts-mode-hook #'eglot-ensure)
+(add-hook 'json-ts-mode-hook #'cs/eglot-format-on-save-if-capable)
 #+end_src
 
 * Go development
@@ -574,6 +670,19 @@ and =writeroom= / =flyspell-mode= retain their original toggles.
 (global-set-key (kbd "C-c =")   (lambda () (interactive) (text-scale-adjust +1)))
 (global-set-key (kbd "C-c -")   (lambda () (interactive) (text-scale-adjust -1)))
 (global-set-key (kbd "C-c 0")   (lambda () (interactive) (text-scale-adjust 0)))
+
+;; C-<backspace>: copy the ENTIRE buffer to the kill ring / system clipboard
+;; without moving point. `buffer-string' reads without motion and `kill-new'
+;; routes to the clipboard (select-enable-clipboard is t), so point and window
+;; never move. Intentional override of `backward-kill-word', which remains on
+;; M-DEL / M-<backspace>. Mirrors the LazyVim Ctrl+Backspace map. Works in GUI
+;; frames; a terminal frame may not distinguish C-<backspace> from C-h.
+(defun cs/copy-whole-buffer ()
+  "Copy the whole buffer to the kill ring (and clipboard) without moving point."
+  (interactive)
+  (kill-new (buffer-string))
+  (message "Buffer copied to clipboard (%d chars)" (buffer-size)))
+(global-set-key (kbd "C-<backspace>") #'cs/copy-whole-buffer)
 
 ;; Find / search "everything" (C-c f …) and M-y live in lisp/quick-search.el,
 ;; which owns the Telescope-style fuzzy-search keymap as the single source of

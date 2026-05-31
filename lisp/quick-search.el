@@ -29,10 +29,25 @@
 ;; The "find / search everything" prefix map.
 ;; Mnemonics mirror LazyVim: f=files, g=grep, b=buffers, r=recent, l=lines …
 ;; ---------------------------------------------------------------------------
+(defun cs/find-files-dwim ()
+  "Telescope `<leader>ff' for Emacs: fuzzy-find files by *name*, not by path.
+In a project, fuzzy-match every tracked file (`project-find-file').  Outside a
+project, fuzzy-match files under `default-directory' via fd (`consult-fd'),
+falling back to the plain path prompt (`find-file') only if fd is unavailable.
+Either way you type a fragment of the filename and pick from the vertico list —
+you never walk a directory tree by hand."
+  (interactive)
+  (cond
+   ((project-current) (call-interactively #'project-find-file))
+   ((and (fboundp 'consult-fd) (executable-find "fd"))
+    (call-interactively #'consult-fd))
+   (t (call-interactively #'find-file))))
+
 (defvar cs/search-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "f" #'find-file)           ;; file by path
-    (define-key map "p" #'project-find-file)   ;; <leader>ff: file in project
+    (define-key map "f" #'cs/find-files-dwim)  ;; <leader>ff: fuzzy file by name
+    (define-key map "p" #'project-find-file)   ;; file in project (explicit)
+    (define-key map "F" #'find-file)           ;; plain path prompt (also C-x C-f)
     (define-key map "d" #'consult-fd)          ;; fast find anywhere (fd)
     (define-key map "r" #'consult-recent-file) ;; recent files
     (define-key map "g" #'consult-ripgrep)     ;; <leader>sg: live grep project
@@ -66,6 +81,48 @@
   (which-key-add-key-based-replacements
     "C-c f" "find/search"
     "C-x f" "find/search"))
+
+;; ---------------------------------------------------------------------------
+;; Recently killed buffers — reopen a file you closed without leaving the fuzzy
+;; buffer list.  Every killed file-visiting buffer is remembered (most recent
+;; first, deduped, capped) and shown as an extra `consult-buffer' source under
+;; a "Killed Buffer" heading; narrow to just those by typing "k SPC".  This is
+;; the "show me buffers I also closed" view, in the same Telescope-style fuzzy
+;; list as everything else (C-x b / C-c f b).
+;; ---------------------------------------------------------------------------
+(defcustom cs/killed-file-buffers-max 60
+  "How many recently killed file buffers to remember for `consult-buffer'."
+  :type 'integer :group 'convenience)
+
+(defvar cs/killed-file-buffers nil
+  "Absolute paths of recently killed file-visiting buffers, most recent first.")
+
+(defun cs/remember-killed-buffer ()
+  "Record the file of the buffer being killed, if it visits one."
+  (when buffer-file-name
+    (setq cs/killed-file-buffers
+          (cons buffer-file-name (delete buffer-file-name cs/killed-file-buffers)))
+    (when (> (length cs/killed-file-buffers) cs/killed-file-buffers-max)
+      (setcdr (nthcdr (1- cs/killed-file-buffers-max) cs/killed-file-buffers) nil))))
+
+(add-hook 'kill-buffer-hook #'cs/remember-killed-buffer)
+
+(with-eval-after-load 'consult
+  (defvar cs/consult-source-killed-buffer
+    `( :name     "Killed Buffer"
+       :narrow   ?k
+       :category file
+       :face     consult-file
+       :history  file-name-history
+       :state    ,#'consult--file-state    ;; preview + open on RET, like recent-file
+       :items
+       ,(lambda ()
+          (seq-filter (lambda (f) (and (not (get-file-buffer f))
+                                       (file-exists-p f)))
+                      cs/killed-file-buffers)))
+    "`consult-buffer' source listing recently killed file buffers.")
+  ;; Show it in the normal buffer list (appended after the live buffers).
+  (add-to-list 'consult-buffer-sources 'cs/consult-source-killed-buffer 'append))
 
 (provide 'quick-search)
 ;;; quick-search.el ends here

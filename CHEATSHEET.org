@@ -35,7 +35,8 @@ errors with =M-g n= / =M-g p= (see Diagnostics).
 * Files, buffers, search  (global)
 | Key       | Command             | Does                                    |
 |-----------+---------------------+-----------------------------------------|
-| =C-c f f=   | find-file           | Open a file                             |
+| =C-c f f=   | cs/find-files-dwim  | Fuzzy find file by name (Telescope <leader>ff) |
+| =C-c f F=   | find-file           | Plain path prompt (open by directory)   |
 | =C-c f r=   | consult-recent-file | Open from recent files                  |
 | =C-c f g=   | consult-ripgrep     | Live grep across the project            |
 | =C-c b b=   | consult-buffer      | Switch buffer (with preview)            |
