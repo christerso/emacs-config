@@ -27,6 +27,7 @@
                   "session-layout"
                   "run-console"
                   "bottom-terminal"
+                  "go-sandbox"
                   "lang-odin"
                   "lang-zig"
                   "lang-sql"
