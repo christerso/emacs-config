@@ -79,6 +79,20 @@ handler is muted while loading to skip remote-file checks.
 ;; navigation are unaffected — they register their own backends.
 (with-eval-after-load 'etags
   (remove-hook 'xref-backend-functions #'etags--xref-backend))
+
+;; C-x k kills the CURRENT buffer outright — no "which buffer?" minibuffer, no
+;; "Buffer has a running process; kill it?", no "Buffer modified; kill anyway?".
+;; Never asks anything. Unsaved changes are discarded (the auto-save files under
+;; ~/.emacs.d/auto-save-list and the backups dir remain on disk as a safety net).
+;; Scoped to the interactive key only — programmatic `kill-buffer' calls from
+;; other packages keep their normal safety checks.
+(defun cs/kill-this-buffer-no-prompt ()
+  "Kill the current buffer with no confirmation of any kind."
+  (interactive)
+  (set-buffer-modified-p nil)
+  (let ((kill-buffer-query-functions nil))
+    (kill-buffer (current-buffer))))
+(global-set-key (kbd "C-x k") #'cs/kill-this-buffer-no-prompt)
 #+end_src
 
 * Backups, autosave, and history
