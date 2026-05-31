@@ -30,7 +30,8 @@
                   "lang-zig"
                   "lang-sql"
                   "lang-tsjs"
-                  "lang-formats"))
+                  "lang-formats"
+                  "lang-markdown"))
   (load module nil 'nomessage))
 
 ;;; init.el ends here
