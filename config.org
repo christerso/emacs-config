@@ -70,7 +70,8 @@ handler is muted while loading to skip remote-file checks.
 (global-so-long-mode 1)
 (repeat-mode 1)
 
-(add-hook 'prog-mode-hook #'display-line-numbers-mode)
+;; Line numbers are OFF by default. Toggle them per buffer with
+;; `M-x display-line-numbers-mode' when you want them.
 (add-hook 'prog-mode-hook #'hl-line-mode)
 
 ;; Never nag for a TAGS table. Drop the etags xref backend so that when no
