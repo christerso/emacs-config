@@ -26,6 +26,7 @@
 (dolist (module '("quick-search"
                   "session-layout"
                   "run-console"
+                  "bottom-terminal"
                   "lang-odin"
                   "lang-zig"
                   "lang-sql"

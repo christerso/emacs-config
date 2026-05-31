@@ -394,6 +394,30 @@ The hunk actions live under a =C-c g= ("git-hunk") prefix.
   :init (with-eval-after-load 'grep (require 'wgrep)))
 #+end_src
 
+* Move lines / regions up and down
+
+=move-text= moves the current line — or the selected region — up or down with
+=C-S-<up>= / =C-S-<down>=, then reindents it so a line dragged into a struct
+picks up the struct's indentation. These are GUI keys; a terminal can't transmit
+Ctrl-Shift-arrows.
+
+#+begin_src emacs-lisp
+(use-package move-text
+  :bind (("C-S-<up>"   . move-text-up)
+         ("C-S-<down>" . move-text-down))
+  :config
+  ;; Reindent the moved line/region so it fits its new context — code only, so
+  ;; prose buffers (org, markdown) are left exactly as moved.
+  (defun cs/move-text-reindent (&rest _)
+    (when (derived-mode-p 'prog-mode)
+      (let ((deactivate-mark nil))
+        (if (use-region-p)
+            (indent-region (region-beginning) (region-end))
+          (indent-according-to-mode)))))
+  (advice-add 'move-text-up   :after #'cs/move-text-reindent)
+  (advice-add 'move-text-down :after #'cs/move-text-reindent))
+#+end_src
+
 * Tree-sitter
 
 Auto-installs grammars on demand and remaps =foo-mode= to =foo-ts-mode= where
