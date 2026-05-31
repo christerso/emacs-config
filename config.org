@@ -635,7 +635,7 @@ opted in.
                     "--background-index"
                     "--clang-tidy"
                     "--completion-style=detailed"
-                    "--header-insertion=never"
+                    "--header-insertion=iwyu"   ;; auto-#include the header when you accept a completion
                     "--pch-storage=memory"
                     "-j=4"))))
 
