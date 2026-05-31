@@ -299,10 +299,16 @@ language server via npm — needs =node=, present as v26) and =M-x copilot-login
 (GitHub device-code auth in the browser).  After that, =copilot-mode= turns on
 in every =prog-mode= buffer.
 
-Accept keys are chosen to work in *both* GUI and TTY Emacs.  =C-<tab>= is the
-GUI accept; a raw terminal can't transmit that, so =M-RET= (Alt-Enter, which
-Alacritty *can* send) accepts too.  The =copilot-completion-map= is only live
-while a suggestion is showing, so these never shadow anything otherwise.
+=TAB= accepts the suggestion.  This is safe because =copilot-completion-map= is
+an *overlay* keymap that is live only while ghost text is showing — overlay maps
+outrank minor-mode (yasnippet) and major-mode maps, so TAB accepts when a
+suggestion is visible and does its normal job (indent / yasnippet) otherwise.
+=C-<tab>= and =M-RET= (Alt-Enter, terminal-safe) are kept as alternates, and the
+accept-by-word / cycle / dismiss keys round it out.
+
+Note on corfu: if corfu's completion popup is up at the same time as ghost text,
+corfu's own keymap takes TAB (the popup wins); TAB accepts Copilot when only the
+ghost text is showing.
 
 #+begin_src emacs-lisp
 (use-package copilot
@@ -310,7 +316,9 @@ while a suggestion is showing, so these never shadow anything otherwise.
   :custom
   (copilot-idle-delay 0.15)            ;; show ghost text shortly after you pause
   :bind (:map copilot-completion-map
-              ("C-<tab>"   . copilot-accept-completion)         ;; GUI accept (whole)
+              ("<tab>"     . copilot-accept-completion)         ;; TAB accept (GUI)
+              ("TAB"       . copilot-accept-completion)         ;; TAB accept (terminal)
+              ("C-<tab>"   . copilot-accept-completion)         ;; alt accept (whole)
               ("M-RET"     . copilot-accept-completion)         ;; TTY-safe accept (whole)
               ("M-<right>" . copilot-accept-completion-by-word) ;; accept one word
               ("M-n"       . copilot-next-completion)           ;; cycle suggestions
