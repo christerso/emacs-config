@@ -323,7 +323,10 @@ ghost text is showing.
               ("M-<right>" . copilot-accept-completion-by-word) ;; accept one word
               ("M-n"       . copilot-next-completion)           ;; cycle suggestions
               ("M-p"       . copilot-previous-completion)
-              ("C-g"       . copilot-clear-overlay)))           ;; dismiss
+              ("C-g"       . copilot-clear-overlay)             ;; dismiss
+              :map copilot-mode-map
+              ("C-c TAB"   . copilot-complete)                  ;; summon a suggestion on demand
+              ("C-c <tab>" . copilot-complete)))
 #+end_src
 
 * Project, VCS, snippets
