@@ -59,9 +59,38 @@ handler is muted while loading to skip remote-file checks.
       sgml-basic-offset 4
       typescript-ts-mode-indent-offset 4)
 
-(global-auto-revert-mode 1)
-(setq global-auto-revert-non-file-buffers t
-      auto-revert-verbose nil)
+;; Files changed on disk: ASK before reloading, rather than silently
+;; auto-reverting. When you return focus to Emacs, or switch to a buffer whose
+;; file changed underneath it, offer to reload — but only if the buffer has no
+;; unsaved edits (those are never touched; you still get the usual conflict
+;; warning on save). Dired and other special buffers, which have no unsaved
+;; state, keep auto-refreshing, since prompting there would be pointless.
+(setq auto-revert-verbose nil)
+(add-hook 'dired-mode-hook #'auto-revert-mode)
+
+(defun cs/maybe-offer-revert (&rest _)
+  "Offer to reload the selected file buffer if it changed on disk and is clean."
+  (unless (minibufferp)
+    (let ((buf (window-buffer (selected-window))))
+      (with-current-buffer buf
+        (when (and buffer-file-name
+                   (not (buffer-modified-p))
+                   (not (file-remote-p buffer-file-name))
+                   (file-exists-p buffer-file-name)
+                   (not (verify-visited-file-modtime buf)))
+          (if (y-or-n-p (format "%s changed on disk. Reload? " (buffer-name)))
+              (revert-buffer :ignore-auto :noconfirm)
+            ;; Declined — accept the on-disk modtime so we stop nagging until
+            ;; the file changes again.
+            (set-visited-file-modtime)))))))
+
+(defun cs/offer-revert-on-focus ()
+  "Run `cs/maybe-offer-revert' only when Emacs has just regained focus."
+  (when (frame-focus-state (selected-frame))
+    (cs/maybe-offer-revert)))
+
+(add-function :after after-focus-change-function #'cs/offer-revert-on-focus)
+(add-hook 'window-selection-change-functions #'cs/maybe-offer-revert)
 
 (delete-selection-mode 1)
 (electric-pair-mode 1)
