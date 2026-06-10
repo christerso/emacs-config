@@ -20,9 +20,10 @@
   (nerd-icons-completion-mode)
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 
-;; A little more breathing room + dynamic resize for the candidate list.
+;; A tall candidate list — vertico-count is what sets the height of the
+;; centered posframe panel. Resize stays dynamic for short result sets.
 (with-eval-after-load 'vertico
-  (setq vertico-count 15
+  (setq vertico-count 25
         vertico-resize t))
 
 ;; ---------------------------------------------------------------------------
