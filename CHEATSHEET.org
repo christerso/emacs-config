@@ -38,10 +38,17 @@ errors with =M-g n= / =M-g p= (see Diagnostics).
 | =C-c c=     | compile     | Assemble + link (nasm -f elf64 … && ld, or make)  |
 | =C-c C-c=   | recompile   | Re-run last compile                               |
 | =C-c r=     | cs/asm-run  | Assemble, link AND run in *compilation*           |
+| =C-c b=     | dape-breakpoint-toggle | Toggle a breakpoint on this line       |
+| =C-c D=     | cs/asm-debug | Build with debug info + debug (gdb DAP), stops on entry |
 
 =asm-lsp= hovers (=M-x eldoc= / just rest point) document every instruction and
 register — great while learning. Global dialect config (NASM, x86-64):
 =~/.config/asm-lsp/.asm-lsp.toml=; per-project =.asm-lsp.toml= overrides it.
+
+Terminal debugging: plain =gdb= loads *gef* (registers/stack/disasm context on
+every stop; =~/.gdbinit=); =pwndbg= launches pwndbg instead. =sasm= is a
+standalone learning IDE with visual stepping. dape always passes =-nx= so DAP
+sessions skip gef.
 
 * Files, buffers, search  (global)
 | Key       | Command             | Does                                    |

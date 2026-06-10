@@ -61,11 +61,36 @@
   (let ((base (cs/asm--base)))
     (compile (concat compile-command (format "&& ./%s" base)))))
 
+(defun cs/asm-debug ()
+  "Build with debug info and debug the binary with dape (gdb's DAP adapter).
+Stops on the first instruction (works for bare `_start' binaries with no
+main).  Set breakpoints first with \\[dape-breakpoint-toggle] (C-c b)."
+  (interactive)
+  (when (buffer-modified-p) (save-buffer))
+  (let* ((base (file-name-base buffer-file-name))
+         (src  (shell-quote-argument (file-name-nondirectory buffer-file-name)))
+         (build (if (derived-mode-p 'nasm-mode)
+                    (format "nasm -f elf64 -g -F dwarf %s -o %s.o && ld %s.o -o %s"
+                            src base base base)
+                  (format "as -g %s -o %s.o && ld %s.o -o %s"
+                          src base base base))))
+    (unless (zerop (shell-command build))
+      (user-error "Build failed: %s" build))
+    (require 'dape)
+    (dape `( command "gdb"
+             command-args ("--interpreter=dap" "-nx")   ;; -nx: skip gef in ~/.gdbinit
+             command-cwd ,default-directory
+             :request "launch"
+             :program ,(expand-file-name base)
+             :stopOnEntry t))))
+
 (defun cs/asm-bind-keys (map)
-  "Add the assembly build / run keys to keymap MAP."
+  "Add the assembly build / run / debug keys to keymap MAP."
   (define-key map (kbd "C-c c")   #'compile)
   (define-key map (kbd "C-c C-c") #'recompile)
-  (define-key map (kbd "C-c r")   #'cs/asm-run))
+  (define-key map (kbd "C-c r")   #'cs/asm-run)
+  (define-key map (kbd "C-c D")   #'cs/asm-debug)
+  (define-key map (kbd "C-c b")   #'dape-breakpoint-toggle))
 
 (with-eval-after-load 'nasm-mode (cs/asm-bind-keys nasm-mode-map))
 (with-eval-after-load 'asm-mode  (cs/asm-bind-keys asm-mode-map))

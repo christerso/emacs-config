@@ -812,17 +812,29 @@ Smarter than name-matching — clangd uses the include graph."
   (cs/c-bind-keys c++-ts-mode-map))
 #+end_src
 
-* Debugging — dape (Delve)
+* Debugging — dape (Delve, gdb)
 
 =dape= is a modern Debug Adapter Protocol client with no Node dependency.
-Uses =dlv= directly.
+Go uses =dlv= directly; C/C++/assembly use gdb's NATIVE DAP adapter
+(=gdb --interpreter=dap=, built in since gdb 14).
+
+Two gdb specifics:
+- =-nx= skips =~/.gdbinit=, because that file loads gef, whose console
+  context output has no place inside a DAP session.
+- The =gdb= config is offered in assembly buffers too; =lisp/lang-asm.el=
+  binds =C-c D= (build + debug this file) and =C-c b= (toggle breakpoint).
 
 #+begin_src emacs-lisp
 (use-package dape
   :defer t
   :custom
   (dape-buffer-window-arrangement 'right)
-  (dape-inlay-hints t))
+  (dape-inlay-hints t)
+  :config
+  (when-let ((cfg (alist-get 'gdb dape-configs)))
+    (plist-put cfg 'command-args '("--interpreter=dap" "-nx"))
+    (plist-put cfg 'modes '(c-mode c-ts-mode c++-mode c++-ts-mode
+                            nasm-mode asm-mode))))
 #+end_src
 
 * Flymake (built-in diagnostics)
