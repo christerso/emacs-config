@@ -123,6 +123,35 @@ handler is muted while loading to skip remote-file checks.
   (let ((kill-buffer-query-functions nil))
     (kill-buffer (current-buffer))))
 (global-set-key (kbd "C-x k") #'cs/kill-this-buffer-no-prompt)
+
+;; C-c d prompts for a path and creates it, parents and all (like `mkdir -p').
+;; `C-c <letter>' is the user-reserved keyspace, so it fires in EVERY major mode
+;; — unlike `C-c C-d', which go-ts/org/markdown already claim for themselves.
+(defun cs/make-directory (dir)
+  "Create DIR and any missing parent directories, like `mkdir -p'.
+Reads a path with directory-name completion; if it does not exist
+yet it is created rather than merely described."
+  (interactive (list (read-directory-name "Make directory: ")))
+  (make-directory dir t)
+  (message "Created %s" dir))
+(global-set-key (kbd "C-c d") #'cs/make-directory)
+
+;; Stop Emacs from merely *suggesting* `M-x make-directory' when you visit or
+;; save a file under a folder that doesn't exist yet — offer to create the
+;; parent directory on the spot instead. Gated behind y-or-n-p, so nothing is
+;; ever created silently. The visit-time hook returns nil so Emacs still opens
+;; the new buffer; the save-time hook is the backstop for files moved/renamed
+;; into a missing directory after the buffer already exists.
+(defun cs/auto-make-parent-dirs ()
+  "Offer to create the parent directory of the current file if it is missing."
+  (when buffer-file-name
+    (let ((dir (file-name-directory buffer-file-name)))
+      (when (and dir (not (file-directory-p dir))
+                 (y-or-n-p (format "Directory %s does not exist.  Create it? " dir)))
+        (make-directory dir t)))))
+(add-hook 'before-save-hook #'cs/auto-make-parent-dirs)
+(add-hook 'find-file-not-found-functions
+          (lambda () (cs/auto-make-parent-dirs) nil))
 #+end_src
 
 * Backups, autosave, and history
@@ -274,6 +303,11 @@ In-buffer side: =corfu= (popup) + =cape= (completion-at-point extensions).
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
+  ;; fzf/Telescope-style matching: each space-separated component matches as a
+  ;; literal, a regexp, OR a flex subsequence — so "ffi" finds "find_files_init"
+  ;; exactly like typing in Telescope. Literal/regexp are tried first, flex is
+  ;; the fallback, so precise input still ranks precisely.
+  (orderless-matching-styles '(orderless-literal orderless-regexp orderless-flex))
   (completion-category-overrides
    '((file (styles basic partial-completion))
      (eglot (styles orderless))
@@ -292,8 +326,32 @@ In-buffer side: =corfu= (popup) + =cape= (completion-at-point extensions).
   (setq xref-show-xrefs-function #'consult-xref
         xref-show-definitions-function #'consult-xref))
 
+;; Telescope-style CENTERED floating search window. Every minibuffer completion
+;; — C-c f f, consult-ripgrep, find-references, C-x b, M-x — opens in a posframe
+;; floating in the middle of the frame instead of expanding the minibuffer at
+;; the bottom of the screen. This is the Emacs equivalent of Telescope's float.
+;; posframe needs a graphical frame; on a TTY frame vertico-posframe falls back
+;; to the normal minibuffer display by itself (posframe-workable-p check).
+(use-package vertico-posframe
+  :after vertico
+  :custom
+  (vertico-posframe-poshandler #'posframe-poshandler-frame-center)
+  (vertico-posframe-width 120)
+  (vertico-posframe-border-width 2)
+  ;; Keep the popup from jumping around as the candidate count changes.
+  (vertico-posframe-parameters '((left-fringe . 8) (right-fringe . 8)))
+  :config
+  (vertico-posframe-mode 1))
+
 (use-package embark
   :defer t)
+
+;; Fuzzy WORKSPACE-symbol search via the LSP server (Telescope's <leader>sS):
+;; type a fragment of any function/type/method name in the whole project and
+;; jump to it. Works in every eglot language (gopls, clangd, rust-analyzer …).
+;; Bound to C-c f s in lisp/quick-search.el.
+(use-package consult-eglot
+  :after (consult eglot))
 
 (use-package embark-consult
   :after (embark consult)
@@ -345,6 +403,15 @@ ghost text is showing.
   :hook (prog-mode . copilot-mode)
   :custom
   (copilot-idle-delay 0.15)            ;; show ghost text shortly after you pause
+  ;; Big buffers: send up to 1 MB of context (default 100 kB warned on files
+  ;; like app.go or SDL headers). Beyond the limit copilot still works — it
+  ;; sends a window around point — so the warning is noise; silence it.
+  (copilot-max-char 1000000)
+  (copilot-max-char-warning-disable t)
+  ;; We use one indentation width (tab-width = 4) for every language, so when a
+  ;; mode has no entry in copilot-indentation-alist, Copilot's fallback to
+  ;; tab-width is already correct. Silence the "no mode-specific offset" warning.
+  (copilot-indent-offset-warning-disable t)
   :bind (:map copilot-completion-map
               ("<tab>"     . copilot-accept-completion)         ;; TAB accept (GUI)
               ("TAB"       . copilot-accept-completion)         ;; TAB accept (terminal)
@@ -465,6 +532,8 @@ Proto) live in =lisp/lang-formats.el= instead.
 (with-eval-after-load 'treesit
   (dolist (src '((c          "https://github.com/tree-sitter/tree-sitter-c")
                  (cpp        "https://github.com/tree-sitter/tree-sitter-cpp")
+                 (rust       "https://github.com/tree-sitter/tree-sitter-rust")
+                 (html       "https://github.com/tree-sitter/tree-sitter-html")
                  (json       "https://github.com/tree-sitter/tree-sitter-json")
                  (yaml       "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
                  (bash       "https://github.com/tree-sitter/tree-sitter-bash")

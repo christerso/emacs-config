@@ -32,6 +32,17 @@ errors with =M-g n= / =M-g p= (see Diagnostics).
 | =C-c C-c=   | recompile            | Re-run last compile                        |
 | =C-c o=     | cs/clangd-other-file | Switch source ↔ header (via clangd graph)  |
 
+* Assembly — x86-64  (nasm-mode for .asm/.nasm, asm-mode for .s/.S)
+| Key       | Command     | Does                                              |
+|-----------+-------------+---------------------------------------------------|
+| =C-c c=     | compile     | Assemble + link (nasm -f elf64 … && ld, or make)  |
+| =C-c C-c=   | recompile   | Re-run last compile                               |
+| =C-c r=     | cs/asm-run  | Assemble, link AND run in *compilation*           |
+
+=asm-lsp= hovers (=M-x eldoc= / just rest point) document every instruction and
+register — great while learning. Global dialect config (NASM, x86-64):
+=~/.config/asm-lsp/.asm-lsp.toml=; per-project =.asm-lsp.toml= overrides it.
+
 * Files, buffers, search  (global)
 | Key       | Command             | Does                                    |
 |-----------+---------------------+-----------------------------------------|
@@ -39,11 +50,28 @@ errors with =M-g n= / =M-g p= (see Diagnostics).
 | =C-c f F=   | find-file           | Plain path prompt (open by directory)   |
 | =C-c f r=   | consult-recent-file | Open from recent files                  |
 | =C-c f g=   | consult-ripgrep     | Live grep across the project            |
+| =C-c f s=   | consult-eglot-symbols | Fuzzy LSP symbol across whole project (<leader>sS) |
+| =C-c f k=   | cs/find-killed-buffer | Reopen a recently CLOSED file         |
 | =C-c b b=   | consult-buffer      | Switch buffer (with preview)            |
 | =C-x C-b=   | ibuffer             | Buffer list manager                     |
 | =C-c j=     | consult-imenu       | Jump to a symbol in the current file    |
 | =C-c .=     | embark-act          | Act on the thing at point / candidate   |
 | =M-y=       | consult-yank-pop    | Paste from kill-ring with preview       |
+
+All of these (and M-x, C-x b, find-references …) open in a CENTERED floating
+window (=vertico-posframe=), Telescope-style — not in the minibuffer at the
+bottom. Matching is fzf-style: =ffi= finds =find_files_init=; space separates
+independent fuzzy terms.
+
+* LLM — explain selection  (global)
+| Key     | Command        | Does                                                |
+|---------+----------------+-----------------------------------------------------|
+| =C-c e=   | cs/llm-explain | Explain the selected text in a right side window    |
+
+Works on any selection — code, error message, config, prose. With no selection
+in a code buffer it explains the function at point. Engine: =gptel= → GitHub
+Copilot chat (same subscription as copilot.el ghost text; no extra key). The
+Neovim equivalent is a visual selection + =<leader>cce= (CopilotChatExplain).
 
 * Version control / debug  (global)
 | Key       | Command                | Does                                |

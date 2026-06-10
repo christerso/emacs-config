@@ -8,7 +8,11 @@
 
 (let* ((class '((class color) (min-colors 89)))
        ;; Core colors
-       (background "#000000") ;; Pure black background for minimal distraction
+       (background "#010101") ;; Near-pure black. NOT #000000: on a direct-color TTY
+                              ;; terminfo (alacritty-direct) index 0 falls through
+                              ;; setab's "<8 => basic ANSI" branch and renders as the
+                              ;; ANSI-black palette colour (grey 0x707070), not true
+                              ;; black. #010101 packs to >8 so it emits real 24-bit.
        (current-line "#1a1a1a") ;; Dark gray for the current line to provide subtle focus
        (block-background "#222222") ;; Slightly lighter gray for code blocks
        (selection "#2b3a4c") ;; Blue-gray for selected text

@@ -56,6 +56,8 @@ you never walk a directory tree by hand."
     (define-key map "B" #'ibuffer)             ;; full buffer manager
     (define-key map "j" #'consult-imenu)       ;; symbol in file
     (define-key map "i" #'consult-imenu-multi) ;; symbol across buffers
+    (define-key map "s" #'consult-eglot-symbols) ;; <leader>sS: fuzzy LSP symbol in whole project
+    (define-key map "k" #'cs/find-killed-buffer) ;; recently closed files
     (define-key map "o" #'consult-outline)     ;; outline / headings
     (define-key map "m" #'consult-mark)        ;; jump to a mark
     (define-key map "e" #'consult-flymake)     ;; diagnostics
@@ -123,6 +125,13 @@ you never walk a directory tree by hand."
     "`consult-buffer' source listing recently killed file buffers.")
   ;; Show it in the normal buffer list (appended after the live buffers).
   (add-to-list 'consult-buffer-sources 'cs/consult-source-killed-buffer 'append))
+
+(defun cs/find-killed-buffer ()
+  "Fuzzy-pick from recently CLOSED files only (C-c f k).
+The same list also appears inside `consult-buffer' under the Killed Buffer
+heading; this jumps straight to it."
+  (interactive)
+  (consult-buffer '(cs/consult-source-killed-buffer)))
 
 (provide 'quick-search)
 ;;; quick-search.el ends here
