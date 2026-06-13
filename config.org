@@ -68,21 +68,48 @@ handler is muted while loading to skip remote-file checks.
 (setq auto-revert-verbose nil)
 (add-hook 'dired-mode-hook #'auto-revert-mode)
 
+(defvar cs/revert-offer--pending nil
+  "Non-nil while a deferred revert offer is scheduled or running.
+Guards against stacking offers and against the re-entrancy that wedges the
+daemon (see `cs/maybe-offer-revert').")
+
+(defun cs/revert-offer--buffer-stale-p (buf)
+  "Non-nil when BUF visits a clean, local file that changed on disk."
+  (and (buffer-live-p buf)
+       (buffer-local-value 'buffer-file-name buf)
+       (not (buffer-modified-p buf))
+       (not (file-remote-p (buffer-local-value 'buffer-file-name buf)))
+       (file-exists-p (buffer-local-value 'buffer-file-name buf))
+       (not (verify-visited-file-modtime buf))))
+
 (defun cs/maybe-offer-revert (&rest _)
-  "Offer to reload the selected file buffer if it changed on disk and is clean."
-  (unless (minibufferp)
+  "Offer to reload the selected file buffer if it changed on disk and is clean.
+The actual `y-or-n-p' is DEFERRED to an idle timer rather than run inline.
+This hook fires from `window-selection-change-functions' and the focus-change
+function, and opening the minibuffer is itself a window-selection/focus change:
+prompting synchronously here re-enters these hooks and can wedge the daemon.
+Deferring (plus the `cs/revert-offer--pending' guard and an active-minibuffer
+check) breaks that loop — the prompt happens once, at a safe idle moment."
+  (when (and (not cs/revert-offer--pending)
+             (not (active-minibuffer-window))
+             (not (minibufferp)))
     (let ((buf (window-buffer (selected-window))))
-      (with-current-buffer buf
-        (when (and buffer-file-name
-                   (not (buffer-modified-p))
-                   (not (file-remote-p buffer-file-name))
-                   (file-exists-p buffer-file-name)
-                   (not (verify-visited-file-modtime buf)))
-          (if (y-or-n-p (format "%s changed on disk. Reload? " (buffer-name)))
-              (revert-buffer :ignore-auto :noconfirm)
-            ;; Declined — accept the on-disk modtime so we stop nagging until
-            ;; the file changes again.
-            (set-visited-file-modtime)))))))
+      (when (cs/revert-offer--buffer-stale-p buf)
+        (setq cs/revert-offer--pending t)
+        (run-with-idle-timer
+         0.2 nil
+         (lambda ()
+           (unwind-protect
+               ;; Re-check: the file/buffer may have changed during the idle gap.
+               (when (cs/revert-offer--buffer-stale-p buf)
+                 (if (y-or-n-p (format "%s changed on disk. Reload? "
+                                       (buffer-name buf)))
+                     (with-current-buffer buf
+                       (revert-buffer :ignore-auto :noconfirm))
+                   ;; Declined — accept the on-disk modtime so we stop nagging
+                   ;; until the file changes again.
+                   (with-current-buffer buf (set-visited-file-modtime))))
+             (setq cs/revert-offer--pending nil))))))))
 
 (defun cs/offer-revert-on-focus ()
   "Run `cs/maybe-offer-revert' only when Emacs has just regained focus."

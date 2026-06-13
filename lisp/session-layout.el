@@ -26,16 +26,25 @@
   "In-memory snapshot of the last graphical frame's window layout.
 A plist: (:windows WINDOW-STATE :width COLS :height ROWS).")
 
+(defun cs/session--real-graphical-frame-p (frame)
+  "Non-nil when FRAME is a graphical frame the user actually works in.
+Child frames (corfu/posframe popups) are graphical too and pass through
+`delete-frame-functions' constantly; capturing one would overwrite the
+saved layout with a popup-sized stamp."
+  (and (display-graphic-p frame)
+       (not (frame-parameter frame 'parent-frame))))
+
 (defun cs/session--graphical-frame ()
   "Return some live graphical frame, or nil."
-  (seq-find #'display-graphic-p (frame-list)))
+  (seq-find #'cs/session--real-graphical-frame-p (frame-list)))
 
 (defun cs/session-capture (&optional frame)
   "Snapshot FRAME's window layout and outer size into `cs/session-layout'.
 FRAME defaults to a live graphical frame.  Called from `delete-frame-functions'
 with the dying frame, so the layout is grabbed just before it disappears."
   (let ((frame (or frame (cs/session--graphical-frame))))
-    (when (and frame (frame-live-p frame) (display-graphic-p frame))
+    (when (and frame (frame-live-p frame)
+               (cs/session--real-graphical-frame-p frame))
       (setq cs/session-layout
             (list :windows (window-state-get (frame-root-window frame) t)
                   :width   (frame-width frame)
@@ -61,14 +70,17 @@ with the dying frame, so the layout is grabbed just before it disappears."
 
 (defun cs/session-restore ()
   "Restore the saved layout into the current frame, if it is the first one."
-  (when (and (display-graphic-p)
-             (= 1 (seq-count #'display-graphic-p (frame-list))))
+  (when (and (cs/session--real-graphical-frame-p (selected-frame))
+             (= 1 (seq-count #'cs/session--real-graphical-frame-p (frame-list))))
     (cs/session-load-from-disk)
     (when cs/session-layout
       (let ((w  (plist-get cs/session-layout :width))
             (h  (plist-get cs/session-layout :height))
             (st (plist-get cs/session-layout :windows)))
-        (when (and w h) (ignore-errors (set-frame-size (selected-frame) w h)))
+        ;; Sanity floor: a saved size smaller than this is popup garbage,
+        ;; not a layout anyone worked in — never shrink the frame to it.
+        (when (and w h (>= w 40) (>= h 12))
+          (ignore-errors (set-frame-size (selected-frame) w h)))
         (when st (ignore-errors
                    (window-state-put st (frame-root-window) 'safe)))
         (ignore-errors (redraw-frame))))))
